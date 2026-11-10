@@ -10,6 +10,7 @@ Uso (dalla cartella del progetto):
 La prima volta serve l'ambiente con mutagen:
     python3 -m venv .venv && .venv/bin/pip install mutagen
 """
+import base64
 import html
 import json
 import re
@@ -52,7 +53,7 @@ def esegui_nel_browser():
     def blocco(id_):
         m = re.search(rf'<pre id="{id_}">(.*?)</pre>', dom, re.S)
         return json.loads(html.unescape(m.group(1))) if m and m.group(1).strip() else None
-    return blocco("esito"), blocco("letture")
+    return blocco("esito"), blocco("letture"), blocco("scritti")
 
 
 def lettura_mutagen(percorso):
@@ -100,7 +101,7 @@ def lettura_mutagen(percorso):
 
 def main():
     print("1) Prove nel browser (test/index.html)")
-    esito, letture = esegui_nel_browser()
+    esito, letture, scritti = esegui_nel_browser()
     if not esito:
         sys.exit("   Non sono riuscito a leggere il risultato delle prove.")
     for f in esito["fallite"]:
@@ -128,6 +129,42 @@ def main():
     if not letture:
         differenze += 1
         print("   nessuna lettura ricevuta dal browser")
+
+    print("3) File SCRITTI da Tag-liatelle, controllati da mutagen e byte per byte")
+    with tempfile.TemporaryDirectory() as cartella:
+        for nome, s in sorted((scritti or {}).items()):
+            dati = base64.b64decode(s["base64"])
+            percorso = Path(cartella) / nome
+            percorso.write_bytes(dati)
+            problemi = []
+            loro = lettura_mutagen(str(percorso))
+            if loro["campi"] != s["campi"]:
+                for k in sorted(set(s["campi"]) | set(loro["campi"])):
+                    if s["campi"].get(k) != loro["campi"].get(k):
+                        problemi.append(f"{k}: atteso {s['campi'].get(k)!r}, mutagen {loro['campi'].get(k)!r}")
+            from mutagen.id3 import ID3
+            versione = "2.%d" % ID3(str(percorso), load_v1=False).version[1]
+            if versione != s["versione"]:
+                problemi.append(f"versione: attesa {s['versione']}, mutagen {versione}")
+            # audio: calcolato qui in Python, senza usare il codice di Tag-liatelle
+            inizio = 0
+            if dati[:3] == b"ID3":
+                b = dati[6:10]
+                inizio = 10 + ((b[0] << 21) | (b[1] << 14) | (b[2] << 7) | b[3])
+            fine = len(dati) - 128 if dati[-128:-125] == b"TAG" else len(dati)
+            originale = (RADICE / "esempi" / nome).read_bytes()[s["audio"]["inizio"]:s["audio"]["fine"]]
+            if dati[inizio:fine] != originale:
+                problemi.append("l'audio NON è identico all'originale")
+            if problemi:
+                differenze += 1
+                print(f"   ✗ {nome}")
+                for p in problemi:
+                    print("     " + p)
+            else:
+                print(f"   ✓ {nome}  (v{versione}, audio identico)")
+    if not scritti:
+        differenze += 1
+        print("   nessun file scritto ricevuto dal browser")
 
     ok = not esito["fallite"] and not differenze
     print("\nTUTTO A POSTO" if ok else "\nCI SONO PROBLEMI")
