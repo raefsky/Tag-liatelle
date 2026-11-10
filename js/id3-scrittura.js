@@ -116,6 +116,27 @@
   }
 
   // ------------------------------------------------------------------
+  // Copertina (immagine frontale, tipo 3)
+  // modifiche.copertina = { azione: "sostituisci", dati: Uint8Array, mime }
+  //                     | { azione: "rimuovi" }
+  // Le altre immagini del file (retro, libretto, ecc.) restano com'erano.
+  // ------------------------------------------------------------------
+  const COPERTINA = "copertina";
+
+  /** Le immagini da sostituire o togliere: tutte le frontali; se non ce ne sono, per togliere, la prima. */
+  function immaginiDaToccare(t, copertina) {
+    const immagini = ((t && t.frames) || []).filter((f) => f.nome === "APIC" && f.leggibile);
+    const frontali = immagini.filter((f) => f.tipoImmagine === 3);
+    if (frontali.length) return new Set(frontali);
+    if (copertina.azione === "rimuovi" && immagini.length) return new Set([immagini[0]]);
+    return new Set();
+  }
+  function frameCopertina(c, major) {
+    // codifica 0 (Latin-1) e descrizione vuota: la forma più compatibile con tutti i lettori
+    return frame("APIC", unisci(Uint8Array.of(0), latin1(c.mime), Uint8Array.of(0, 3, 0), c.dati), major);
+  }
+
+  // ------------------------------------------------------------------
   // I frame esistenti, così come sono
   // ------------------------------------------------------------------
   /** Riscrive un frame letto da un file v2.3 o v2.4 senza cambiarne il contenuto. */
@@ -176,6 +197,7 @@
   function valoriFinali(lettura, modifiche) {
     const finali = { ...((lettura && lettura.campi) || {}) };
     for (const [k, v] of Object.entries(modifiche)) {
+      if (k === COPERTINA) continue; // la copertina non è un campo di testo
       const vuoto = v == null || (Array.isArray(v) ? !String(v[0] || "").trim() : !String(v).trim());
       if (vuoto) delete finali[k];
       else if (Array.isArray(v)) finali[k] = [String(v[0]).trim(), String(v[1] || "").trim()];
@@ -199,11 +221,19 @@
     const t = lettura.tag;
     // con il solo ID3v1, il nuovo tag parte dai valori del vecchio
     if (!t && lettura.v1) modifiche = { ...lettura.campi, ...modifiche };
-    const campiCambiati = Object.keys(modifiche);
+    const copertina = modifiche[COPERTINA] || null;
+    const campiCambiati = Object.keys(modifiche).filter((k) => k !== COPERTINA);
     const pezzi = [];
     const giaScritti = new Set();
+    const bersagli = copertina ? immaginiDaToccare(t, copertina) : new Set();
+    let copertinaScritta = false;
 
     for (const f of (t && t.frames) || []) {
+      if (bersagli.has(f)) {
+        // la vecchia copertina frontale: al suo posto la nuova (o niente, se va tolta)
+        if (copertina.azione === "sostituisci" && !copertinaScritta) { pezzi.push(frameCopertina(copertina, major)); copertinaScritta = true; }
+        continue;
+      }
       const campo = campiCambiati.find((k) => appartiene(f, k));
       if (campo) {
         // al posto del primo frame del campo va il nuovo valore; gli altri doppioni si tolgono
@@ -222,6 +252,7 @@
       const nuovo = nuovoFrame(campo, modifiche[campo], major, null);
       if (nuovo) pezzi.push(nuovo);
     }
+    if (copertina && copertina.azione === "sostituisci" && !copertinaScritta) pezzi.push(frameCopertina(copertina, major));
 
     const corpo = unisci(...pezzi);
     // se il nuovo tag sta nello spazio del vecchio, l'audio resta esattamente dove era
@@ -271,5 +302,5 @@
     return b;
   }
 
-  return { controlla, costruisci, valoriFinali, RIEMPIMENTO };
+  return { controlla, costruisci, valoriFinali, RIEMPIMENTO, COPERTINA };
 });
