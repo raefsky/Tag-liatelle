@@ -320,9 +320,30 @@ dialog {
 }
 dialog::backdrop { background: rgba(43, 31, 23, .35); }
 dialog h2 { font-size: 1.3rem; margin-bottom: 10px; }
-.tasti { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 16px; }
-.tasti dt { white-space: nowrap; }
-.tasti dd { margin: 0; }
+dialog.largo { max-width: min(760px, calc(100vw - 32px)); }
+.tasti, .compatibili { border-collapse: collapse; width: 100%; margin: 0 0 16px; font-size: 0.92rem; }
+.tasti th, .tasti td, .compatibili th, .compatibili td {
+  text-align: left; vertical-align: top; padding: 7px 10px 7px 0; border-bottom: 1.5px dotted var(--riga);
+}
+.tasti thead th, .compatibili thead th {
+  font-size: 0.75rem; letter-spacing: .07em; text-transform: uppercase; color: var(--inchiostro-tenue); font-weight: 400;
+  border-bottom: 1.5px solid var(--inchiostro);
+}
+.tasti tbody th, .compatibili tbody th { font-weight: 700; }
+.tasti td { white-space: nowrap; }
+.tasti td.tuo { background: var(--uovo-tenue); padding-left: 8px; }
+.tasti thead small { text-transform: none; letter-spacing: 0; }
+
+/* "Come funziona" */
+.info { margin-top: 22px; display: grid; gap: 4px; }
+.info-blocco { border-top: 1.5px dashed var(--riga); padding-top: 12px; margin-bottom: 8px; }
+.info-blocco h3 { font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.info-blocco ul { margin: 0; padding-left: 1.2em; }
+.info-blocco li { margin-bottom: 3px; }
+.info-blocco .bottone { margin-left: 4px; padding: 5px 10px; }
+.nota-piccola { font-size: 0.85rem; color: var(--inchiostro-tenue); margin: 0 0 8px; }
+.giudizio { margin: 0; padding: 6px 10px; border-left: 4px solid var(--uovo); background: var(--uovo-tenue); }
+.giudizio.attenzione { border-left-color: var(--timbro); background: transparent; border: 1.5px solid var(--timbro); border-left-width: 4px; }
 kbd {
   font: 700 0.85rem var(--f-dati); border: 1.5px solid var(--inchiostro); border-bottom-width: 3px;
   padding: 0 5px; border-radius: 2px; background: var(--carta);
@@ -369,3 +390,6 @@ kbd {
 :root[data-movimento="no"] *, :root[data-movimento="no"] *::before, :root[data-movimento="no"] *::after {
   animation: none !important; transition: none !important;
 }
+
+/* nella tabella dei browser il nome resta su una riga (sugli schermi larghi) */
+@media (min-width: 700px) { .compatibili tbody th { white-space: nowrap; padding-right: 18px; } }

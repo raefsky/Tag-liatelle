@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Tag-liatelle">
+<title>Tag-liatelle</title>
+<!-- Tag-liatelle · © Roberto Lanza · CC BY-NC-SA 4.0 -->
+<defs><clipPath id="p"><path d="M10.8 7H26.6Q28.8 7 28.8 9.2V22.8Q28.8 25 26.6 25H10.8L3.4 16ZM7 16a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0-4.8 0Z" clip-rule="evenodd"/></clipPath></defs>
+<g transform="rotate(-8 16 16)">
+<!-- alone chiaro: il simbolo resta visibile anche nelle schede scure del browser -->
+<path d="M10.8 7H26.6Q28.8 7 28.8 9.2V22.8Q28.8 25 26.6 25H10.8L3.4 16Z" fill="none" stroke="#F2E8D5" stroke-width="3.6" stroke-linejoin="round"/>
+<path d="M10.8 7H26.6Q28.8 7 28.8 9.2V22.8Q28.8 25 26.6 25H10.8L3.4 16ZM7 16a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0-4.8 0Z" fill="#2B1F17" fill-rule="evenodd"/>
+<g clip-path="url(#p)" fill="none" stroke="#E5A823" stroke-width="3.6" stroke-linecap="round"><path d="M0 10.2Q6 8.6 12 10.2T24 10.2T36 10.2"/><path d="M0 16Q6 14.4 12 16T24 16T36 16"/><path d="M0 21.8Q6 20.2 12 21.8T24 21.8T36 21.8"/></g>
+<path d="M10.8 7H26.6Q28.8 7 28.8 9.2V22.8Q28.8 25 26.6 25H10.8L3.4 16Z" fill="none" stroke="#2B1F17" stroke-width="1.8" stroke-linejoin="round"/>
+</g>
+</svg>

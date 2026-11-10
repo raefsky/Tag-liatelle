@@ -45,6 +45,14 @@ def assembla(versione: str) -> Path:
         return f"<script>\n/* --- {m.group(1)} --- */\n" + js + "\n</script>"
     html, n_js = re.subn(r'<script src="([^"]+)"></script>', script, html)
 
+    # icone della pagina (favicon e icona per i dispositivi)
+    tipi = {".svg": "image/svg+xml", ".png": "image/png"}
+    def icona(m):
+        file_icona = RADICE / m.group(2)
+        dati = base64.b64encode(file_icona.read_bytes()).decode("ascii")
+        return f'{m.group(1)}href="data:{tipi[file_icona.suffix]};base64,{dati}">'
+    html = re.sub(r'(<link rel="(?:icon|apple-touch-icon)"[^>]*?)href="([^"]+)">', icona, html)
+
     # versione nel piede della pagina
     html = re.sub(r'<span id="versione">[^<]*</span>', f'<span id="versione">{versione}</span>', html)
 

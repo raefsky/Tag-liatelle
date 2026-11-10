@@ -8,7 +8,18 @@
   "use strict";
 
   const $ = (sel) => document.querySelector(sel);
-  const suMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const piattaforma = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent;
+  const sistema = /Mac|iPhone|iPad/i.test(piattaforma) ? "mac" : /Win/i.test(piattaforma) ? "windows" : /Linux|CrOS|X11/i.test(piattaforma) ? "linux" : "altro";
+
+  // Le scorciatoie, scritte per esteso per i due tipi di tastiera
+  const SCORCIATOIE = [
+    { cosa: "Salvare le modifiche (dopo l'anteprima)", mac: ["⌘ Cmd", "S"],        pc: ["Ctrl", "S"] },
+    { cosa: "Passare alla traccia successiva",          mac: ["⌥ Option", "↓"],    pc: ["Alt", "↓"] },
+    { cosa: "Tornare alla traccia precedente",          mac: ["⌥ Option", "↑"],    pc: ["Alt", "↑"] },
+    { cosa: "Vedere le scorciatoie",                    mac: ["?"],                pc: ["?"] },
+    { cosa: "Chiudere una finestrella",                 mac: ["Esc"],              pc: ["Esc"] },
+  ];
+  const tasti = (lista) => lista.flatMap((t, i) => (i ? [" + ", el("kbd", { testo: t })] : [el("kbd", { testo: t })]));
 
   /** Crea un elemento. Il testo passa sempre da textContent: niente HTML iniettato dai tag. */
   function el(nome, attributi, ...figli) {
@@ -138,8 +149,8 @@
       c.append(
         el("p", { classe: "inventario", testo: "Scheda n. —" }),
         el("h2", { testo: "Nessuna traccia aperta" }),
-        el("p", { testo: "Quando apri dei file, qui compare la scheda della traccia scelta: titolo, artista, copertina e tutti gli altri dati." }),
-        el("p", { classe: "nome-file", testo: "Funziona con file MP3 e FLAC. I file non lasciano mai il tuo computer." })
+        el("p", { testo: "Quando apri dei file, qui compare la scheda della traccia scelta: titolo, artista, copertina e tutti gli altri dati. Funziona con file MP3 e FLAC." }),
+        contenutoInfo()
       );
       return;
     }
@@ -218,6 +229,44 @@
     avvisa("Così appare il timbro quando un file è stato salvato davvero.");
   }
 
+  // ---------- "Come funziona": privacy, browser, tastiera ----------
+  function contenutoInfo() {
+    const nomeSistema = { mac: "Mac", windows: "Windows", linux: "Linux" }[sistema];
+    const giudizio = stato.modo === "completo"
+      ? `Stai usando ${stato.nomeBrowser}${nomeSistema ? " su " + nomeSistema : ""}: puoi usare tutte le funzioni.`
+      : `Stai usando ${stato.nomeBrowser}: puoi lavorare un file alla volta e scaricare la copia modificata.`;
+    return el("div", { classe: "info" },
+      el("section", { classe: "info-blocco" },
+        el("h3", {}, icona("casa"), "Tutto avviene sul tuo computer"),
+        el("ul", {},
+          el("li", { testo: "I file vengono letti e modificati qui, nel tuo browser: non vengono mai caricati su internet." }),
+          el("li", { testo: "Non servono account né iscrizioni, e non c'è nessuna statistica sul tuo uso." }),
+          el("li", { testo: "Caratteri e programmi sono già dentro la pagina: funziona anche senza connessione." }),
+          el("li", { testo: "Prima di scrivere in un file, Tag-liatelle ne fa una copia di sicurezza accanto all'originale." })
+        )
+      ),
+      el("section", { classe: "info-blocco" },
+        el("h3", {}, icona("file"), "Browser compatibili"),
+        el("table", { classe: "compatibili" },
+          el("thead", {}, el("tr", {}, el("th", { scope: "col", testo: "Browser" }), el("th", { scope: "col", testo: "Cosa puoi fare" }))),
+          el("tbody", {},
+            el("tr", {}, el("th", { scope: "row", testo: "Chrome 86 o successivo" }), el("td", { testo: "Tutto: apri intere cartelle e salvi direttamente nei file. Su Windows, Mac, Linux e Chromebook." })),
+            el("tr", {}, el("th", { scope: "row", testo: "Edge 86 o successivo" }), el("td", { testo: "Tutto, come Chrome. Su Windows, Mac e Linux." })),
+            el("tr", {}, el("th", { scope: "row", testo: "Safari e Firefox" }), el("td", { testo: "Un file alla volta: lo apri, lo modifichi e scarichi una copia. L'originale non viene toccato." })),
+            el("tr", {}, el("th", { scope: "row", testo: "Telefoni e tablet" }), el("td", { testo: "Pensato per il computer: sullo schermo piccolo si legge, ma si salva solo scaricando una copia." }))
+          )
+        ),
+        el("p", { classe: "nota-piccola", testo: "Altri browser basati su Chrome (Opera, Vivaldi) di solito funzionano, ma non sono provati. Brave tiene spenta la funzione che serve per salvare nei file." }),
+        el("p", { classe: "giudizio" + (stato.modo === "completo" ? "" : " attenzione"), testo: giudizio })
+      ),
+      el("section", { classe: "info-blocco" },
+        el("h3", {}, icona("tastiera"), "Scorciatoie da tastiera"),
+        el("p", {}, "Le trovi sempre con il tasto ", el("kbd", { testo: "?" }), " oppure con il pulsante della tastiera in alto. ",
+          el("button", { classe: "bottone leggero", type: "button", suclick: () => $("#scorciatoie").showModal() }, "Vedi le scorciatoie"))
+      )
+    );
+  }
+
   // ---------- Il piatto vuoto (disegno) ----------
   function piattoVuoto() {
     const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -251,9 +300,18 @@
   }
 
   // ---------- Scorciatoie ----------
-  $("#tasto-mod").textContent = suMac ? "⌘" : "Ctrl";
   const finestra = $("#scorciatoie");
+  $("#righe-tasti").append(...SCORCIATOIE.map((r) => el("tr", {},
+    el("th", { scope: "row", testo: r.cosa }),
+    el("td", { classe: sistema === "mac" ? "tuo" : "" }, tasti(r.mac)),
+    el("td", { classe: sistema === "windows" || sistema === "linux" ? "tuo" : "" }, tasti(r.pc))
+  )));
+  if (sistema === "mac") $("#col-mac").append(el("small", { testo: " (il tuo)" }));
+  if (sistema === "windows" || sistema === "linux") $("#col-pc").append(el("small", { testo: " (il tuo)" }));
   $("#apri-scorciatoie").addEventListener("click", () => finestra.showModal());
+
+  const finestraInfo = $("#info");
+  $("#apri-info").addEventListener("click", () => { $("#info-contenuto").replaceChildren(contenutoInfo()); finestraInfo.showModal(); });
 
   document.addEventListener("keydown", (e) => {
     const inCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.readOnly;
@@ -268,7 +326,7 @@
       apri(corrente + (e.key === "ArrowDown" ? 1 : -1));
       return;
     }
-    if (e.key === "?" && !inCampo && !finestra.open) { e.preventDefault(); finestra.showModal(); }
+    if (e.key === "?" && !inCampo && !finestra.open && !finestraInfo.open) { e.preventDefault(); finestra.showModal(); }
   });
 
   // ---------- Partenza ----------
