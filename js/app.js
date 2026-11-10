@@ -179,6 +179,11 @@
     catch (e) {
       console.error(e);
       const tecnico = ((e && e.name) || "Errore") + ": " + ((e && e.message) || String(e));
+      if (e && e.name === "TypeMismatchError") {
+        // nella finestra "scegli cartella" è stato scelto un file (il Mac lo permette)
+        avvisa("Hai scelto un file, ma qui serve una cartella. Seleziona la cartella e premi «Apri». Per aprire file singoli usa «Apri file».", 9000);
+        return;
+      }
       const testo = e && e.name === "NotAllowedError"
         ? "Il browser non ha dato il permesso di leggere i file."
         : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.";

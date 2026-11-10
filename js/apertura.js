@@ -29,15 +29,15 @@
   }
 
   /**
-   * Il browser ricorda l'ultima posizione di ogni finestra di scelta grazie a un "id".
-   * Se quel ricordo si confonde (Edge, su Mac, ha dato "TypeMismatchError"),
-   * riproviamo una volta senza ricordo.
+   * Il browser ricorda l'ultima posizione di ogni finestra di scelta grazie a un "id"
+   * (uno per le cartelle, uno per i file). Se il ricordo punta a un posto che non
+   * esiste più ("NotFoundError"), riproviamo una volta senza ricordo.
    */
   async function conRiprova(apri, id) {
     try {
       return await apri({ id });
     } catch (e) {
-      if (e && (e.name === "TypeMismatchError" || e.name === "NotFoundError")) return apri({});
+      if (e && e.name === "NotFoundError") return apri({});
       throw e;
     }
   }
