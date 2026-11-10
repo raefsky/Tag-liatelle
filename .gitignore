@@ -16,3 +16,7 @@ Tag-liatelle copie/
 *.opus
 !esempi/**/*.mp3
 !esempi/**/*.flac
+
+# ambiente Python per i test (mutagen)
+.venv/
+__pycache__/

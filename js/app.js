@@ -1,8 +1,8 @@
 /* ==========================================================================
    Tag-liatelle · interfaccia
-   Blocco 1: scheletro della pagina. Non legge né scrive ancora nessun file:
-   mostra lo stato vuoto, una scheda di esempio (dati inventati) per giudicare
-   l'aspetto, il tema chiaro/scuro, le scorciatoie e il controllo del browser.
+   Apre cartelle e file (con i pulsanti o trascinandoli), legge i tag MP3 e
+   mostra la pila di schede e la scheda grande. Per ora legge soltanto:
+   la modifica e il salvataggio arrivano nel blocco 3.
    ========================================================================== */
 (function () {
   "use strict";
@@ -46,11 +46,11 @@
 
   // ---------- Messaggio breve in basso ----------
   let timerMessaggio;
-  function avvisa(testo) {
+  function avvisa(testo, durata = 3800) {
     const m = $("#messaggio");
     m.textContent = testo; m.hidden = false;
     clearTimeout(timerMessaggio);
-    timerMessaggio = setTimeout(() => (m.hidden = true), 3800);
+    timerMessaggio = setTimeout(() => (m.hidden = true), durata);
   }
 
   // ---------- Preferenze (salvate solo in questo browser) ----------
@@ -93,55 +93,176 @@
     if (!stato.cartelle) $("#apri-cartella").title = "Serve Chrome o Edge";
   }
 
-  // ---------- Apertura (arriva nel blocco 2) ----------
-  const nonAncora = () => avvisa("L'apertura dei file arriva nella prossima versione. Per ora puoi guardare la scheda di esempio.");
-  $("#apri-cartella").addEventListener("click", nonAncora);
-  $("#apri-file").addEventListener("click", nonAncora);
+  // ---------- Formati di numeri e misure ----------
+  const numeri = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
+  function misura(byte) {
+    if (byte < 1024) return byte + " byte";
+    if (byte < 1024 * 1024) return numeri.format(byte / 1024) + " KB";
+    return numeri.format(byte / 1024 / 1024) + " MB";
+  }
+  const TIPI_IMMAGINE = ["Altra immagine", "Icona del file", "Altra icona", "Copertina davanti", "Copertina dietro", "Libretto",
+    "Disco (supporto)", "Solista", "Artista", "Direttore", "Gruppo", "Compositore", "Paroliere", "Luogo di registrazione",
+    "Durante la registrazione", "Durante il concerto", "Fotogramma video", "Pesce colorato", "Illustrazione", "Logo dell'artista", "Logo dell'editore"];
+  const nomeTipo = (n) => TIPI_IMMAGINE[n] || "Immagine di tipo " + n;
+  const nomeFormatoImmagine = (mime) => ({ "image/jpeg": "JPEG", "image/png": "PNG", "image/gif": "GIF", "image/webp": "WebP", "image/bmp": "BMP" }[mime] || mime);
 
-  // ---------- Dati di esempio (inventati, non sono file veri) ----------
-  const ESEMPIO = [
-    { file: "01 Matassa d'oro.mp3", formato: "MP3", versione: "ID3v2.3", valori: { titolo: "Matassa d'oro", artista: "Le Sfogline", album: "Al dente", anno: "2026", genere: "Folk", traccia: ["1", "3"], disco: ["1", "1"], copyright: "© 2026 Le Sfogline", editore: "Edizioni del Mattarello", licenza: "CC BY-NC-SA 4.0", bpm: "92" } },
-    { file: "02 Sfoglia sottile.mp3", formato: "MP3", versione: "ID3v2.3", valori: { titolo: "Sfoglia sottile", artista: "Le Sfogline", album: "Al dente", anno: "2026", genere: "Folk", traccia: ["2", "3"], disco: ["1", "1"] } },
-    { file: "03 Ragù della domenica (versione lunga).flac", formato: "FLAC", versione: "Vorbis", valori: { titolo: "Ragù della domenica (versione lunga)", artista: "Le Sfogline feat. Nonna Ìrma", album: "Al dente", anno: "2026", genere: "Folk", traccia: ["3", "3"], disco: ["1", "1"] } },
-  ];
+  // ---------- Le tracce aperte ----------
+  // ogni traccia: { nome, percorso, file, maniglia, formato, stato: "lettura"|"letto"|"errore"|"attesa", lettura }
+  let tracce = [];
+  let corrente = -1;
+  let inLettura = 0;
 
-  let tracce = [];     // quelle mostrate nella pila
-  let corrente = -1;   // indice della traccia aperta
+  const chiaveTraccia = (t) => t.percorso + "|" + t.file.size + "|" + t.file.lastModified;
+  const confronto = new Intl.Collator("it", { numeric: true, sensitivity: "base" });
+  const numero = (x) => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : Infinity; };
+  const confrontaNumeri = (a, b) => (a === b ? 0 : a === Infinity ? 1 : b === Infinity ? -1 : a - b);
+
+  function ordina() {
+    const scelta = tracce[corrente];
+    tracce.sort((a, b) => {
+      const ca = (a.lettura && a.lettura.campi) || {}, cb = (b.lettura && b.lettura.campi) || {};
+      const cartella = confronto.compare(a.percorso.replace(/[^/]*$/, ""), b.percorso.replace(/[^/]*$/, ""));
+      if (cartella) return cartella;
+      // prima per disco, poi per numero di traccia; chi non ha il numero va in fondo
+      // senza numero di disco si considera il disco 1
+      const disco = confrontaNumeri(numero((ca.disco || [])[0] || 1), numero((cb.disco || [])[0] || 1));
+      if (disco) return disco;
+      const traccia = confrontaNumeri(numero((ca.traccia || [])[0]), numero((cb.traccia || [])[0]));
+      if (traccia) return traccia;
+      return confronto.compare(a.nome, b.nome);
+    });
+    corrente = scelta ? tracce.indexOf(scelta) : tracce.length ? 0 : -1;
+  }
+
+  /** Aggiunge (o sostituisce) le tracce e le legge una alla volta. */
+  async function aggiungi(nuove, { sostituisci = false } = {}) {
+    if (sostituisci) { tracce = []; corrente = -1; }
+    const gia = new Set(tracce.map(chiaveTraccia));
+    const daLeggere = nuove.filter((t) => !gia.has(chiaveTraccia(t))).map((t) => ({ ...t, stato: "lettura", lettura: null }));
+    const scartati = nuove.length - daLeggere.length;
+    tracce.push(...daLeggere);
+    if (corrente < 0 && tracce.length) corrente = 0;
+    inLettura += daLeggere.length;
+    disegnaPila();
+    let fatti = 0;
+    for (const t of daLeggere) {
+      if (t.formato === "FLAC") {
+        t.stato = "attesa"; // la lettura dei FLAC arriva nel blocco 5
+      } else {
+        try {
+          t.lettura = await Id3.leggiMp3(Apertura.lettorePezzi(t.file), t.file.size);
+          t.stato = "letto";
+        } catch (e) {
+          t.stato = "errore";
+          t.errore = String((e && e.message) || e);
+        }
+      }
+      fatti++;
+      inLettura--;
+      if (fatti % 25 === 0) mostraAvanzamento(fatti, daLeggere.length);
+    }
+    ordina();
+    disegnaPila();
+    disegnaScheda();
+    if (!nuove.length) avvisa("Non ho trovato file MP3 o FLAC.");
+    else if (daLeggere.length) avvisa(daLeggere.length === 1 ? "Ho letto 1 file." : `Ho letto ${daLeggere.length} file.`);
+    else if (scartati) avvisa("Questi file erano già aperti.");
+  }
+
+  function mostraAvanzamento(fatti, totale) {
+    $("#conteggio").textContent = `lettura: ${fatti} di ${totale}…`;
+  }
+
+  // ---------- Apertura ----------
+  async function conErrori(azione) {
+    try { await azione(); }
+    catch (e) {
+      console.error(e);
+      const tecnico = ((e && e.name) || "Errore") + ": " + ((e && e.message) || String(e));
+      if (e && e.name === "TypeMismatchError") {
+        // nella finestra "scegli cartella" è stato scelto un file (il Mac lo permette)
+        avvisa("Hai scelto un file, ma qui serve una cartella. Seleziona la cartella e premi «Apri». Per aprire file singoli usa «Apri file».", 9000);
+        return;
+      }
+      const testo = e && e.name === "NotAllowedError"
+        ? "Il browser non ha dato il permesso di leggere i file."
+        : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.";
+      avvisa(testo + " (Dettagli tecnici: " + tecnico + ")", 15000);
+    }
+  }
+  $("#apri-cartella").addEventListener("click", () => conErrori(async () => {
+    const scelta = await Apertura.scegliCartella((n) => ($("#conteggio").textContent = `cerco i file: ${n}…`));
+    if (scelta.nome === null) return; // annullato
+    await aggiungi(scelta.file, { sostituisci: true });
+  }));
+  $("#apri-file").addEventListener("click", () => conErrori(async () => {
+    const scelti = await Apertura.scegliFile();
+    if (scelti.length) await aggiungi(scelti);
+  }));
+
+  // trascinare file o cartelle sulla pagina
+  let profondita = 0;
+  const conFile = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+  document.addEventListener("dragenter", (e) => { if (!conFile(e)) return; profondita++; document.body.classList.add("trascino"); });
+  document.addEventListener("dragleave", () => { if (--profondita <= 0) { profondita = 0; document.body.classList.remove("trascino"); } });
+  document.addEventListener("dragover", (e) => { if (conFile(e)) e.preventDefault(); });
+  document.addEventListener("drop", (e) => {
+    if (!conFile(e)) return;
+    e.preventDefault();
+    profondita = 0;
+    document.body.classList.remove("trascino");
+    const dt = e.dataTransfer;
+    conErrori(async () => aggiungi(await Apertura.daTrascinamento(dt)));
+  });
+
+  function chiudiTutto() {
+    tracce = []; corrente = -1;
+    disegnaPila(); disegnaScheda();
+    avvisa("Ho tolto le schede. I file sono rimasti come erano.");
+  }
 
   // ---------- La pila ----------
   function disegnaPila() {
     const contenitore = $("#pila-contenuto");
     contenitore.replaceChildren();
-    $("#conteggio").textContent = tracce.length ? tracce.length + (tracce.length === 1 ? " scheda" : " schede") : "";
+    $("#conteggio").textContent = !tracce.length ? "" : inLettura ? "lettura in corso…" : tracce.length + (tracce.length === 1 ? " scheda" : " schede");
 
     if (!tracce.length) {
       contenitore.append(
         el("div", { classe: "vuoto" },
           piattoVuoto(),
           el("p", { classe: "grande", testo: "Il piatto è vuoto." }),
-          el("p", { testo: "Tante tagliatelle, nessuna etichetta. Apri una cartella o qualche file per cominciare." }),
-          el("button", { classe: "bottone leggero", type: "button", suclick: mostraEsempio }, icona("occhio-esempio"), "Guarda una scheda di esempio")
+          el("p", { testo: "Tante tagliatelle, nessuna etichetta. Apri una cartella o qualche file per cominciare, oppure trascinali qui." })
         )
       );
       return;
     }
     const lista = el("ol", { classe: "elenco", "aria-label": "Tracce aperte" });
     tracce.forEach((t, i) => {
+      const c = (t.lettura && t.lettura.campi) || {};
+      const sotto = t.stato === "attesa" ? "FLAC: lettura in arrivo"
+        : t.stato === "errore" ? "non riesco a leggerlo"
+        : t.stato === "lettura" ? "lettura…"
+        : c.artista || "artista sconosciuto";
       lista.append(el("li", {},
-        el("button", { classe: "voce", type: "button", "aria-current": i === corrente ? "true" : false, suclick: () => apri(i) },
-          el("span", { classe: "numero", testo: (t.valori.traccia && t.valori.traccia[0]) || "–" }),
-          el("span", { classe: "titolo", testo: t.valori.titolo || t.file }),
+        el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : ""), type: "button", "aria-current": i === corrente ? "true" : false, suclick: () => apri(i) },
+          el("span", { classe: "numero", testo: (c.traccia && c.traccia[0]) || "–" }),
+          el("span", { classe: "titolo", testo: c.titolo || t.nome }),
           el("span", { classe: "formato", testo: t.formato }),
-          el("span", { classe: "artista", testo: t.valori.artista || "artista sconosciuto" })
+          el("span", { classe: "artista", testo: sotto })
         )
       ));
     });
     contenitore.append(lista,
-      el("p", {}, el("button", { classe: "bottone leggero", type: "button", suclick: togliEsempio }, icona("chiudi"), "Togli l'esempio")));
+      el("p", {}, el("button", { classe: "bottone leggero", type: "button", suclick: chiudiTutto }, icona("chiudi"), "Togli tutte le schede")));
   }
 
   // ---------- La scheda grande ----------
+  let indirizziImmagini = [];
+  function liberaImmagini() { indirizziImmagini.forEach((u) => URL.revokeObjectURL(u)); indirizziImmagini = []; }
+
   function disegnaScheda() {
+    liberaImmagini();
     const c = $("#scheda-contenuto");
     c.replaceChildren();
     const t = tracce[corrente];
@@ -155,35 +276,92 @@
       return;
     }
 
-    const numero = String(corrente + 1).padStart(3, "0");
+    const l = t.lettura;
+    const campi = (l && l.campi) || {};
+    const numeroScheda = String(corrente + 1).padStart(3, "0");
+    const versione = !l ? "" : l.tag ? "ID3v" + l.tag.versione + (l.v1 ? " + ID3v1" : "") : l.v1 ? "solo ID3v1" : "nessun tag";
+    const inventario = [`Scheda n. ${numeroScheda}`, t.formato, versione, misura(t.file.size)].filter(Boolean).join(" · ");
+
     c.append(
       el("div", { classe: "scheda-testa" },
         el("div", { classe: "chi" },
-          el("p", { classe: "inventario", testo: `Scheda n. ${numero} · ${t.formato} · ${t.versione}` }),
-          el("h2", { testo: t.valori.titolo || "Senza titolo" }),
-          el("p", { testo: t.valori.artista || "" }),
-          el("p", { classe: "nome-file", testo: t.file })
+          el("p", { classe: "inventario", testo: inventario }),
+          el("h2", { testo: campi.titolo || t.nome }),
+          el("p", { testo: campi.artista || "" }),
+          el("p", { classe: "nome-file", testo: t.percorso })
         ),
-        el("div", { classe: "foto", role: "img", "aria-label": "Nessuna copertina" }, el("span", { testo: "nessuna copertina" }))
+        fotoCopertina(l)
       )
     );
 
+    if (t.stato === "attesa") {
+      c.append(el("p", { classe: "nota-esempio", testo: "Questo è un file FLAC: Tag-liatelle imparerà a leggerlo nella prossima versione. Per ora il file resta com'è." }));
+      return;
+    }
+    if (t.stato === "errore") {
+      c.append(riquadroAvvisi(["Non riesco a leggere questo file. Potrebbe essere rovinato, oppure non è davvero un MP3. Il file non è stato toccato.", t.errore]));
+      return;
+    }
+    if (l && l.avvisi.length) c.append(riquadroAvvisi(l.avvisi));
+    if (l && !l.tag && !l.v1) c.append(el("p", { classe: "nota-esempio", testo: "Questo file non ha ancora nessun tag: è una tagliatella senza etichetta." }));
+
     for (const g of Campi.GRUPPI) {
-      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, t.valori[campo.id])));
+      const pieni = g.campi.filter((campo) => vuoto(campi[campo.id]) === false).length;
+      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, campi[campo.id])));
+      if (g.id === "extra" && l && l.personalizzati.length) griglia.append(personalizzati(l.personalizzati));
       if (g.sempreAperto) {
         c.append(el("div", { classe: "gruppo" }, el("h3", { testo: g.nome }), griglia));
       } else {
-        c.append(el("details", { classe: "gruppo" }, el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota })), griglia));
+        const conta = pieni + (g.id === "extra" && l ? l.personalizzati.length : 0);
+        c.append(el("details", { classe: "gruppo" },
+          el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota + (conta ? ` · ${conta} compilat${conta === 1 ? "o" : "i"}` : "") })), griglia));
       }
     }
 
-    c.append(
-      el("div", { classe: "nota-esempio" },
-        el("p", { testo: "Questa è una scheda di esempio con dati inventati: non corrisponde a nessun file e non si può modificare." }),
-        el("button", { classe: "bottone", type: "button", suclick: provaTimbro }, icona("timbro"), "Prova il timbro")
-      ),
-      el("div", { classe: "timbro", id: "timbro", hidden: true, "aria-hidden": "true" }, "Salvato", el("small", { id: "timbro-data" }))
+    if (l) c.append(riquadroConservati(l));
+    c.append(el("p", { classe: "nota-piccola", testo: "Per ora Tag-liatelle legge soltanto: la modifica e il salvataggio arrivano nella prossima versione." }));
+  }
+
+  const vuoto = (v) => v == null || v === "" || (Array.isArray(v) && v.every((x) => !x));
+
+  function fotoCopertina(l) {
+    const imm = (l && l.immagini) || [];
+    const fronte = imm.find((i) => i.tipo === 3) || imm[0];
+    if (!fronte) return el("div", { classe: "foto", role: "img", "aria-label": "Nessuna copertina" }, el("span", { testo: "nessuna copertina" }));
+    const url = URL.createObjectURL(new Blob([fronte.dati], { type: fronte.mime }));
+    indirizziImmagini.push(url);
+    const didascalia = el("figcaption", { testo: `${nomeTipo(fronte.tipo)} · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}` });
+    const img = el("img", { src: url, alt: nomeTipo(fronte.tipo) });
+    img.addEventListener("load", () => {
+      didascalia.textContent = `${nomeTipo(fronte.tipo)} · ${img.naturalWidth} × ${img.naturalHeight} px · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}`;
+    });
+    img.addEventListener("error", () => { img.replaceWith(el("span", { testo: "immagine illeggibile" })); });
+    const altre = imm.length - 1;
+    return el("figure", { classe: "copertina" },
+      el("div", { classe: "foto" }, img),
+      didascalia,
+      altre > 0 ? el("figcaption", { testo: `più ${altre} altr${altre === 1 ? "a immagine" : "e immagini"}: ${imm.filter((i) => i !== fronte).map((i) => nomeTipo(i.tipo).toLowerCase()).join(", ")}` }) : null
     );
+  }
+
+  function riquadroAvvisi(righe) {
+    return el("div", { classe: "avviso avviso-scheda", role: "note" }, icona("avviso"),
+      el("div", {}, ...righe.map((r) => el("p", { testo: r }))));
+  }
+
+  function riquadroConservati(l) {
+    const altri = l.altri;
+    if (!altri.length) return null;
+    const nomi = [...new Set(altri)].join(", ");
+    return el("p", { classe: "conservati" },
+      icona("timbro"),
+      `Nel file ci sono anche ${altri.length} ${altri.length === 1 ? "dato" : "dati"} che Tag-liatelle non mostra (${nomi}). Verranno conservati così come sono.`);
+  }
+
+  function personalizzati(lista) {
+    return el("div", { classe: "campo largo personalizzati" },
+      el("span", { classe: "etichetta", testo: "Campi personalizzati" }),
+      el("dl", {}, ...lista.flatMap((p) => [el("dt", { testo: p.nome }), el("dd", { testo: p.valore })])));
   }
 
   function disegnaCampo(campo, valore) {
@@ -207,7 +385,7 @@
     }
     if (campo.tipo === "si-no") {
       return el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }),
-        el("input", { id, value: valore ? "sì" : "no", readonly: true }));
+        el("input", { id, value: vuoto(valore) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(valore).trim()) ? "sì" : "no", readonly: true }));
     }
     return el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), el("input", { id, value: valore || "", readonly: true }));
   }
@@ -216,19 +394,9 @@
     if (i < 0 || i >= tracce.length) return;
     corrente = i;
     disegnaPila(); disegnaScheda();
+    const voce = document.querySelector('.voce[aria-current="true"]');
+    if (voce) voce.scrollIntoView({ block: "nearest" });
   }
-  function mostraEsempio() { tracce = ESEMPIO; corrente = 0; disegnaPila(); disegnaScheda(); $("#scheda").focus(); }
-  function togliEsempio() { tracce = []; corrente = -1; disegnaPila(); disegnaScheda(); }
-
-  function provaTimbro() {
-    const t = $("#timbro");
-    $("#timbro-data").textContent = new Date().toLocaleDateString("it-IT");
-    t.hidden = false;
-    t.classList.remove("impresso");
-    if (animazioniAttive()) { void t.offsetWidth; t.classList.add("impresso"); }
-    avvisa("Così appare il timbro quando un file è stato salvato davvero.");
-  }
-
   // ---------- "Come funziona": privacy, browser, tastiera ----------
   function contenutoInfo() {
     const nomeSistema = { mac: "Mac", windows: "Windows", linux: "Linux" }[sistema];
@@ -241,6 +409,7 @@
         el("ul", {},
           el("li", { testo: "I file vengono letti e modificati qui, nel tuo browser: non vengono mai caricati su internet." }),
           el("li", { testo: "Non servono account né iscrizioni, e non c'è nessuna statistica sul tuo uso." }),
+          el("li", { testo: "Ricorda soltanto l'ultima cartella da cui hai aperto i file, per ripartire da lì: il ricordo resta in questo browser." }),
           el("li", { testo: "Caratteri e programmi sono già dentro la pagina: funziona anche senza connessione." }),
           el("li", { testo: "Prima di scrivere in un file, Tag-liatelle ne fa una copia di sicurezza accanto all'originale." })
         )
@@ -317,7 +486,7 @@
     const inCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.readOnly;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
-      avvisa("Non c'è ancora niente da salvare.");
+      avvisa("Il salvataggio arriva nella prossima versione: per ora Tag-liatelle legge soltanto.");
       return;
     }
     if (e.altKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -332,6 +501,7 @@
   // ---------- Partenza ----------
   disegnaPila();
   disegnaScheda();
-  // indirizzo che finisce con #esempio: apre subito la scheda di esempio (comodo per le prove)
-  if (location.hash === "#esempio") mostraEsempio();
+
+  // per le prove automatiche: permette di aprire file senza le finestre di scelta
+  window.TagLiatelle = { aggiungi, tracce: () => tracce };
 })();

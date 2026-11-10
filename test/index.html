@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prove Tag-liatelle</title>
+<style>
+  :root { --carta: #F2E8D5; --inchiostro: #2B1F17; --verde-ok: #2B1F17; --timbro: #B3362B; --uovo: #E5A823; }
+  @media (prefers-color-scheme: dark) { :root { --carta: #241D17; --inchiostro: #EFE4CF; --timbro: #E36A55; } }
+  body { margin: 0; padding: 24px 16px; background: var(--carta); color: var(--inchiostro); font: 15px/1.5 "Courier New", monospace; }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font: 700 1.6rem Georgia, serif; margin: 0 0 4px; }
+  #riepilogo { font-weight: 700; font-size: 1.1rem; padding: 8px 12px; border: 2px solid; display: inline-block; }
+  #riepilogo.ok { border-color: var(--uovo); }
+  #riepilogo.ko, li.ko { color: var(--timbro); }
+  ul { padding-left: 0; list-style: none; }
+  li { padding: 2px 0; border-bottom: 1px dotted #998; }
+  details { margin-top: 24px; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prove di Tag-liatelle</h1>
+  <p>Queste prove controllano il codice che legge i tag, usando i file di <code>esempi/</code>. Non toccano nessun file vero.</p>
+  <p id="riepilogo">Prove in corso…</p>
+  <ul id="elenco"></ul>
+  <details>
+    <summary>Dati tecnici (per lo script di verifica)</summary>
+    <pre id="esito"></pre>
+    <pre id="letture"></pre>
+  </details>
+</main>
+
+<script src="../js/binario.js"></script>
+<script src="../js/campi.js"></script>
+<script src="../js/id3.js"></script>
+<script src="esempi-dati.js"></script>
+<script src="banco-prova.js"></script>
+<script src="prove-id3.js"></script>
+<script>eseguiProve();</script>
+</body>
+</html>
