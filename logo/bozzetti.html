@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tag-liatelle · bozzetti del logo</title>
+<style>
+  @font-face { font-family: "Fraunces"; src: url("../font/fraunces-variabile.woff2") format("woff2"); font-weight: 400 800; font-display: swap; }
+  @font-face { font-family: "Courier Prime"; src: url("../font/courier-prime-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Courier Prime"; src: url("../font/courier-prime-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+  :root {
+    --carta: #F2E8D5;
+    --cartellino: #FBF5E8;
+    --inchiostro: #2B1F17;
+    --inchiostro-tenue: #6B5A4B;
+    --uovo: #E5A823;
+    --timbro: #B3362B;
+    --scuro-carta: #2A231C;
+    --scuro-inchiostro: #EFE4CF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 64px;
+    background: var(--carta); color: var(--inchiostro);
+    font: 16px/1.5 "Courier Prime", "Courier New", monospace;
+  }
+  main { max-width: 1100px; margin: 0 auto; }
+  h1 { font: 700 2.4rem/1.1 "Fraunces", Georgia, serif; margin: 0 0 6px; }
+  h1 .trattino { color: var(--uovo); }
+  .sotto { color: var(--inchiostro-tenue); margin: 0 0 32px; }
+  .tavola {
+    background: var(--cartellino);
+    border: 1.5px solid var(--inchiostro);
+    border-radius: 2px 14px 2px 2px;
+    padding: 24px;
+    margin-bottom: 28px;
+    display: grid; grid-template-columns: 260px 1fr; gap: 28px;
+  }
+  .tavola h2 { font: 650 1.5rem/1.2 "Fraunces", Georgia, serif; margin: 0 0 4px; }
+  .lettera {
+    display: inline-block; font-weight: 700; border: 1.5px solid var(--inchiostro);
+    padding: 0 8px; margin-right: 8px; transform: rotate(-3deg);
+  }
+  .grande { width: 260px; height: 260px; display: block; background: var(--carta); border: 1px dashed var(--inchiostro-tenue); }
+  .prove { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; margin: 18px 0; }
+  .prova { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--inchiostro-tenue); }
+  .prova svg { display: block; }
+  .fondo-scuro { background: var(--scuro-carta); padding: 10px; }
+  .fondo-chiaro { background: var(--carta); padding: 10px; }
+  .mono { color: var(--inchiostro); }
+  .mono-scuro { color: var(--scuro-inchiostro); }
+  .marchio { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .marchio svg { width: 56px; height: 56px; }
+  .marchio b { font: 700 2rem/1 "Fraunces", Georgia, serif; }
+  .marchio b span { color: var(--uovo); }
+  .marchio.scuro { background: var(--scuro-carta); color: var(--scuro-inchiostro); padding: 10px 14px; display: inline-flex; }
+  ul { margin: 8px 0 0; padding-left: 20px; }
+  .nota { border-left: 3px solid var(--uovo); padding: 6px 12px; margin-top: 32px; }
+  @media (max-width: 720px) {
+    .tavola { grid-template-columns: 1fr; }
+    .grande { width: 100%; height: auto; aspect-ratio: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!--
+  Ogni simbolo usa due "variabili":
+  --nastro : colore della pasta (giallo nella versione a colori, inchiostro nella versione a un colore)
+  --bordo  : colore del contorno e del laccetto
+  --fondo  : colore del foro (uguale allo sfondo)
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- A · Il nido-etichetta: tre giri di tagliatella che seguono la forma dell'etichetta -->
+    <symbol id="logo-a" viewBox="0 0 100 100">
+      <g transform="rotate(-10 50 50)" fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <g stroke="var(--bordo)" stroke-width="9">
+          <path d="M34 22 H80 Q88 22 88 30 V70 Q88 78 80 78 H34 L12 50 Z"/>
+          <path d="M38 31 H71 Q79 31 79 39 V61 Q79 69 71 69 H38 L23 50 Z"/>
+          <path d="M42 40 H62 Q70 40 70 48 V52 Q70 60 62 60 H42 L34 50 Z"/>
+        </g>
+        <g stroke="var(--nastro)" stroke-width="6">
+          <path d="M34 22 H80 Q88 22 88 30 V70 Q88 78 80 78 H34 L12 50 Z"/>
+          <path d="M38 31 H71 Q79 31 79 39 V61 Q79 69 71 69 H38 L23 50 Z"/>
+          <path d="M42 40 H62 Q70 40 70 48 V52 Q70 60 62 60 H42 L34 50 Z"/>
+        </g>
+        <circle cx="52" cy="50" r="4.5" fill="var(--fondo)" stroke="var(--bordo)" stroke-width="2.2"/>
+      </g>
+      <path d="M50 49 C42 34 30 18 14 10 C6 6 2 14 8 18" fill="none" stroke="var(--bordo)" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- B · L'etichetta a strisce: tagliatelle stese una accanto all'altra, ritagliate a forma di etichetta -->
+    <symbol id="logo-b" viewBox="0 0 100 100">
+      <defs>
+        <clipPath id="taglio-b">
+          <path d="M32 24 H82 Q88 24 88 30 V72 Q88 78 82 78 H32 L10 51 Z"/>
+        </clipPath>
+      </defs>
+      <g transform="rotate(-8 50 50)">
+        <path d="M32 24 H82 Q88 24 88 30 V72 Q88 78 82 78 H32 L10 51 Z" fill="var(--bordo)"/>
+        <g clip-path="url(#taglio-b)" fill="none" stroke="var(--nastro)" stroke-width="7" stroke-linecap="round">
+          <path d="M4 30 Q20 26 36 30 T68 30 T100 30"/>
+          <path d="M4 41 Q20 37 36 41 T68 41 T100 41"/>
+          <path d="M4 52 Q20 48 36 52 T68 52 T100 52"/>
+          <path d="M4 63 Q20 59 36 63 T68 63 T100 63"/>
+          <path d="M4 74 Q20 70 36 74 T68 74 T100 74"/>
+        </g>
+        <path d="M32 24 H82 Q88 24 88 30 V72 Q88 78 82 78 H32 L10 51 Z" fill="none" stroke="var(--bordo)" stroke-width="2.6" stroke-linejoin="round"/>
+        <circle cx="27" cy="51" r="5.5" fill="var(--fondo)" stroke="var(--bordo)" stroke-width="2.4"/>
+      </g>
+      <path d="M26 49 C18 38 14 24 22 14 C28 7 38 10 34 18" fill="none" stroke="var(--bordo)" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- C · Il nido arrotolato: una spirale di tagliatella il cui ultimo giro si allunga nella punta dell'etichetta -->
+    <symbol id="logo-c" viewBox="0 0 100 100">
+      <g transform="rotate(-14 50 52)">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path id="spirale-c" d="M54 44 A8 8 0 0 1 54 60 A12 12 0 0 1 54 36 A16 16 0 0 1 54 68 A20 20 0 0 1 54 28 A24 24 0 0 1 54 76 L32 76 L12 52 L32 28 L50 28"
+              stroke="var(--bordo)" stroke-width="8.5"/>
+        <path d="M54 44 A8 8 0 0 1 54 60 A12 12 0 0 1 54 36 A16 16 0 0 1 54 68 A20 20 0 0 1 54 28 A24 24 0 0 1 54 76 L32 76 L12 52 L32 28 L50 28"
+              stroke="var(--nastro)" stroke-width="5.5"/>
+      </g>
+      <circle cx="54" cy="52" r="4.5" fill="var(--fondo)" stroke="var(--bordo)" stroke-width="2.2"/>
+      </g>
+      <path d="M56 50 C66 38 78 22 90 14 C96 10 98 18 92 20" fill="none" stroke="var(--bordo)" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main>
+  <h1>Tag<span class="trattino">-</span>liatelle</h1>
+  <p class="sotto">Tre bozzetti del logo. Sceglierne uno (o dire cosa prendere da ciascuno); poi lo rifinisco.</p>
+
+  <!-- Le tre tavole sono generate qui sotto da un piccolo script, così sono identiche nella struttura -->
+  <div id="tavole"></div>
+
+  <p class="nota">
+    Come leggere le prove: <b>a colori</b> su carta chiara e su carta scura, <b>a un colore</b> (per timbri e stampe),
+    e alle misure piccole <b>64, 32 e 16 pixel</b>, che sono quelle della scheda del browser.
+    Un buon logo deve restare riconoscibile anche nel quadratino da 16.
+  </p>
+</main>
+
+<script>
+  const bozzetti = [
+    { id: "a", nome: "Il nido-etichetta",
+      idea: "Tre giri di tagliatella seguono il contorno dell'etichetta, uno dentro l'altro, come un nido. Il foro sta al centro del nido.",
+      pro: ["Richiama subito sia il nido sia l'etichetta.", "Il contorno a punta si legge bene anche piccolo."],
+      contro: ["A 16 pixel i tre giri si fondono in una macchia gialla."] },
+    { id: "b", nome: "L'etichetta a strisce",
+      idea: "Tagliatelle stese una accanto all'altra e ritagliate a forma di etichetta, con l'occhiello e il laccetto.",
+      pro: ["Il più semplice da riconoscere da piccolo.", "Le strisce ondulate ricordano la pasta fresca appena tagliata."],
+      contro: ["Il nido arrotolato si perde: è più \"pasta stesa\" che \"nido\"."] },
+    { id: "c", nome: "Il nido arrotolato",
+      idea: "Una sola tagliatella arrotolata a spirale; l'ultimo giro si allunga e forma la punta dell'etichetta. Il laccetto esce dal centro.",
+      pro: ["Il più fedele all'idea del nido.", "Un solo tratto continuo: ha un'aria disegnata a mano."],
+      contro: ["La punta è meno marcata: l'etichetta si capisce un attimo dopo."] },
+  ];
+
+  const colori = {
+    chiaro: "--nastro: var(--uovo); --bordo: var(--inchiostro); --fondo: var(--carta);",
+    scuro:  "--nastro: #EDBA45; --bordo: var(--scuro-inchiostro); --fondo: var(--scuro-carta);",
+    mono:   "--nastro: var(--cartellino); --bordo: currentColor; --fondo: var(--carta);",
+    monoScuro: "--nastro: var(--scuro-carta); --bordo: currentColor; --fondo: var(--scuro-carta);",
+  };
+  const simbolo = (id, stile, lato) =>
+    `<svg width="${lato}" height="${lato}" style="${stile}" role="img" aria-label="Bozzetto ${id.toUpperCase()}"><use href="#logo-${id}"/></svg>`;
+
+  document.getElementById("tavole").innerHTML = bozzetti.map(b => `
+    <section class="tavola">
+      <svg class="grande" viewBox="0 0 100 100" style="${colori.chiaro}" role="img" aria-label="Bozzetto ${b.id.toUpperCase()} grande"><use href="#logo-${b.id}"/></svg>
+      <div>
+        <h2><span class="lettera">${b.id.toUpperCase()}</span>${b.nome}</h2>
+        <p>${b.idea}</p>
+        <div class="prove">
+          <div class="prova"><span class="fondo-chiaro">${simbolo(b.id, colori.chiaro, 64)}</span>64 px</div>
+          <div class="prova"><span class="fondo-chiaro">${simbolo(b.id, colori.chiaro, 32)}</span>32 px</div>
+          <div class="prova"><span class="fondo-chiaro">${simbolo(b.id, colori.chiaro, 16)}</span>16 px</div>
+          <div class="prova"><span class="fondo-scuro">${simbolo(b.id, colori.scuro, 64)}</span>scuro</div>
+          <div class="prova"><span class="fondo-scuro">${simbolo(b.id, colori.scuro, 16)}</span>scuro 16</div>
+          <div class="prova"><span class="fondo-chiaro mono">${simbolo(b.id, colori.mono, 64)}</span>un colore</div>
+          <div class="prova"><span class="fondo-scuro mono-scuro">${simbolo(b.id, colori.monoScuro, 64)}</span>un colore, scuro</div>
+        </div>
+        <div class="marchio">${simbolo(b.id, colori.chiaro, 56)}<b>Tag<span>-</span>liatelle</b></div>
+        <div class="marchio scuro">${simbolo(b.id, colori.scuro, 56)}<b>Tag<span>-</span>liatelle</b></div>
+        <ul>
+          ${b.pro.map(p => `<li>+ ${p}</li>`).join("")}
+          ${b.contro.map(c => `<li>− ${c}</li>`).join("")}
+        </ul>
+      </div>
+    </section>`).join("");
+</script>
+</body>
+</html>
