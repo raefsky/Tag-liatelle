@@ -22,22 +22,25 @@
 <body>
 <main>
   <h1>Prove di Tag-liatelle</h1>
-  <p>Queste prove controllano il codice che legge i tag, usando i file di <code>esempi/</code>. Non toccano nessun file vero.</p>
+  <p>Queste prove controllano il codice che legge e scrive i tag, usando i file di <code>esempi/</code>. Non toccano nessun file vero.</p>
   <p id="riepilogo">Prove in corso…</p>
   <ul id="elenco"></ul>
   <details>
     <summary>Dati tecnici (per lo script di verifica)</summary>
     <pre id="esito"></pre>
     <pre id="letture"></pre>
+    <pre id="scritti"></pre>
   </details>
 </main>
 
 <script src="../js/binario.js"></script>
 <script src="../js/campi.js"></script>
 <script src="../js/id3.js"></script>
+<script src="../js/id3-scrittura.js"></script>
 <script src="esempi-dati.js"></script>
 <script src="banco-prova.js"></script>
 <script src="prove-id3.js"></script>
+<script src="prove-scrittura.js"></script>
 <script>eseguiProve();</script>
 </body>
 </html>
