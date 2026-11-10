@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tag-liatelle</title>
+<meta name="description" content="Metadati e copertine per i tuoi file audio MP3 e FLAC, nel browser e senza inviare niente a nessuno.">
+<meta name="author" content="Roberto Lanza">
+<meta name="color-scheme" content="light dark">
+<!-- Il tema scelto si applica subito, prima di disegnare la pagina, per evitare il lampo di colore sbagliato -->
+<script>
+  try { var t = localStorage.getItem("tagliatelle.tema"); if (t === "chiaro" || t === "scuro") document.documentElement.dataset.tema = t; } catch (e) {}
+  try { if (localStorage.getItem("tagliatelle.movimento") === "no") document.documentElement.dataset.movimento = "no"; } catch (e) {}
+</script>
+<link rel="stylesheet" href="css/stile.css">
+<link rel="icon" type="image/svg+xml" href="logo/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="logo/icone/favicon-32.png">
+<link rel="apple-touch-icon" href="logo/icone/apple-touch-icon-180.png">
+</head>
+<body>
+
+<!-- =====================================================================
+     Icone disegnate a mano: tutte su griglia 24×24, tratto 1,8, estremità
+     arrotondate. Si usano con <svg class="icona"><use href="#i-nome"/></svg>
+     ===================================================================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-cartella" viewBox="0 0 24 24"><path d="M3 7.5V18a1.2 1.2 0 0 0 1.2 1.2h15.6A1.2 1.2 0 0 0 21 18V9.6a1.2 1.2 0 0 0-1.2-1.2H11.4L9.3 5.6H4.2A1.2 1.2 0 0 0 3 6.8z"/><path d="M3.4 11h17.2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6.2 3h7.9L19 7.9V20a1 1 0 0 1-1 1H6.2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3.2V8h4.8"/><circle cx="10.2" cy="16.6" r="1.7"/><path d="M11.9 16.6v-5.2l3-.9"/></symbol>
+    <symbol id="i-sole" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.8"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
+    <symbol id="i-luna" viewBox="0 0 24 24"><path d="M19.6 14.6A7.9 7.9 0 1 1 9.4 4.4a6.3 6.3 0 0 0 10.2 10.2z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.8"/><path d="M12 4.2a7.8 7.8 0 0 1 0 15.6z" fill="currentColor"/></symbol>
+    <symbol id="i-avviso" viewBox="0 0 24 24"><path d="M12 3.6 21.2 19.6H2.8z"/><path d="M12 9.6v4.4"/><path d="M12 16.9v.1" stroke-width="2.4"/></symbol>
+    <symbol id="i-tastiera" viewBox="0 0 24 24"><rect x="2.8" y="6.2" width="18.4" height="11.6" rx="1.2"/><path d="M6.4 9.8h.1M9.6 9.8h.1M12.8 9.8h.1M16 9.8h.1M6.4 13h.1M17.6 13h.1M8.8 14.4h6.4" stroke-width="2"/></symbol>
+    <symbol id="i-su" viewBox="0 0 24 24"><path d="M12 19V5.4M6.4 11 12 5.4 17.6 11"/></symbol>
+    <symbol id="i-giu" viewBox="0 0 24 24"><path d="M12 5v13.6M6.4 13 12 18.6 17.6 13"/></symbol>
+    <symbol id="i-chiudi" viewBox="0 0 24 24"><path d="M6.2 6.2l11.6 11.6M17.8 6.2 6.2 17.8"/></symbol>
+    <symbol id="i-timbro" viewBox="0 0 24 24"><path d="M9.6 3.6h4.8l-.8 6h4.6a1 1 0 0 1 1 .8l.8 3.8H4l.8-3.8a1 1 0 0 1 1-.8h4.6z"/><path d="M5 17.4h14M7 20.4h10"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.6"/><path d="M12 7.6v.1" stroke-width="2.4"/></symbol>
+    <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3.6 11.2 12 4.4l8.4 6.8"/><path d="M5.8 9.6v9.8h12.4V9.6"/><path d="M10 19.4v-5.2h4v5.2"/></symbol>
+    <symbol id="i-occhio-esempio" viewBox="0 0 24 24"><path d="M4.4 4.4h10.2l5 5V19.6H4.4z"/><path d="M8 10h6M8 13.4h8M8 16.8h5"/></symbol>
+  </defs>
+</svg>
+
+<a class="salta" href="#scheda">Vai alla scheda</a>
+
+<header class="testata">
+  <a class="marchio" href="#" aria-label="Tag-liatelle, pagina iniziale">
+    <!-- il simbolo del logo (stessi tracciati di logo/tag-liatelle-simbolo.svg), con i colori del tema -->
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <defs><clipPath id="taglio-marchio"><path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51ZM22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" clip-rule="evenodd"/></clipPath></defs>
+      <g transform="rotate(-8 50 50)">
+        <path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51ZM22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" fill="var(--inchiostro)" fill-rule="evenodd"/>
+        <g clip-path="url(#taglio-marchio)" fill="none" stroke="var(--uovo)" stroke-width="7" stroke-linecap="round">
+          <path d="M4 30Q20 26 36 30T68 30T100 30"/><path d="M4 41Q20 37 36 41T68 41T100 41"/><path d="M4 52Q20 48 36 52T68 52T100 52"/><path d="M4 63Q20 59 36 63T68 63T100 63"/><path d="M4 74Q20 70 36 74T68 74T100 74"/>
+        </g>
+        <path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51Z" fill="none" stroke="var(--inchiostro)" stroke-width="2.8" stroke-linejoin="round"/>
+        <path d="M22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" fill="none" stroke="var(--inchiostro)" stroke-width="2.6"/>
+      </g>
+      <path d="M26.6 46.2C19 36 15 23 22.4 13.6C28 6.8 38 9.6 34.4 17.6" fill="none" stroke="var(--inchiostro)" stroke-width="2.6" stroke-linecap="round"/>
+    </svg>
+    <span>
+      <h1>Tag<span class="trattino">-</span>liatelle</h1>
+      <span class="motto">metadati e copertine, cotti al dente</span>
+    </span>
+  </a>
+
+  <div class="azioni">
+    <button class="bottone principale" id="apri-cartella" type="button">
+      <svg class="icona" aria-hidden="true"><use href="#i-cartella"/></svg>Apri cartella
+    </button>
+    <button class="bottone" id="apri-file" type="button">
+      <svg class="icona" aria-hidden="true"><use href="#i-file"/></svg>Apri file
+    </button>
+    <div class="tema" role="group" aria-label="Tema dei colori">
+      <button type="button" data-tema="auto" aria-pressed="true" title="Tema automatico (come il computer)"><svg class="icona" aria-hidden="true"><use href="#i-auto"/></svg><span class="solo-lettori">Automatico</span></button>
+      <button type="button" data-tema="chiaro" aria-pressed="false" title="Tema chiaro"><svg class="icona" aria-hidden="true"><use href="#i-sole"/></svg><span class="solo-lettori">Chiaro</span></button>
+      <button type="button" data-tema="scuro" aria-pressed="false" title="Tema scuro"><svg class="icona" aria-hidden="true"><use href="#i-luna"/></svg><span class="solo-lettori">Scuro</span></button>
+    </div>
+    <button class="bottone leggero" id="apri-info" type="button">
+      <svg class="icona" aria-hidden="true"><use href="#i-info"/></svg><span class="testo-lungo">Come funziona</span>
+    </button>
+    <button class="bottone leggero bottone-icona" id="apri-scorciatoie" type="button" title="Scorciatoie da tastiera (?)" aria-label="Scorciatoie da tastiera">
+      <svg class="icona" aria-hidden="true"><use href="#i-tastiera"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Avviso sul browser: lo riempie js/supporto.js solo se serve -->
+<div class="avviso" id="avviso-browser" role="status" hidden>
+  <svg class="icona" aria-hidden="true"><use href="#i-avviso"/></svg>
+  <div id="avviso-testo"></div>
+</div>
+
+<main class="banco">
+  <!-- La pila di schede (elenco delle tracce) -->
+  <section class="pila" aria-labelledby="titolo-pila">
+    <h2 id="titolo-pila">Le tracce <small id="conteggio"></small></h2>
+    <div id="pila-contenuto"></div>
+  </section>
+
+  <!-- La scheda grande -->
+  <section class="scheda" id="scheda" tabindex="-1" aria-label="Scheda della traccia">
+    <span class="foro" aria-hidden="true"></span>
+    <svg class="laccetto" viewBox="0 0 60 90" aria-hidden="true"><path d="M33 81c-8-14-14-34-16-52C15 14 22 2 30 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <div id="scheda-contenuto"></div>
+  </section>
+</main>
+
+<footer class="piede">
+  <span>© Roberto Lanza · licenza <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.it" rel="license noopener" target="_blank">CC BY-NC-SA 4.0</a></span>
+  <span>Tutto avviene sul tuo computer: nessun file viene caricato su internet.</span>
+  <span>Funziona al completo in Chrome ed Edge.</span>
+  <span>versione <span id="versione">0.1.0</span></span>
+</footer>
+
+<!-- Finestrella delle scorciatoie -->
+<dialog id="scorciatoie" aria-labelledby="titolo-scorciatoie" class="largo">
+  <h2 id="titolo-scorciatoie">Scorciatoie da tastiera</h2>
+  <table class="tasti">
+    <thead><tr><th scope="col">Cosa fa</th><th scope="col" id="col-mac">Mac</th><th scope="col" id="col-pc">Windows e Linux</th></tr></thead>
+    <tbody id="righe-tasti"></tbody>
+  </table>
+  <p>
+    <label><input type="checkbox" id="animazioni"> Animazioni attive</label><br>
+    <small id="nota-animazioni"></small>
+  </p>
+  <form method="dialog"><button class="bottone" type="submit">Chiudi</button></form>
+</dialog>
+
+<!-- Finestrella "Come funziona": il contenuto lo scrive js/app.js -->
+<dialog id="info" aria-labelledby="titolo-info" class="largo">
+  <h2 id="titolo-info">Come funziona Tag-liatelle</h2>
+  <div id="info-contenuto"></div>
+  <form method="dialog"><button class="bottone" type="submit">Chiudi</button></form>
+</dialog>
+
+<div class="messaggio" id="messaggio" role="status" aria-live="polite" hidden></div>
+
+<script src="js/campi.js"></script>
+<script src="js/supporto.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

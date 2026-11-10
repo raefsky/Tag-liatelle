@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Tag-liatelle">
+<title>Tag-liatelle</title>
+<!-- Tag-liatelle · © Roberto Lanza · CC BY-NC-SA 4.0 -->
+<defs><clipPath id="t"><path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51ZM22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" clip-rule="evenodd"/></clipPath></defs>
+<g transform="rotate(-8 50 50)">
+<path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51ZM22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" fill="#2B1F17" fill-rule="evenodd"/>
+<g clip-path="url(#t)" fill="none" stroke="#E5A823" stroke-width="7" stroke-linecap="round"><path d="M4 30Q20 26 36 30T68 30T100 30"/><path d="M4 41Q20 37 36 41T68 41T100 41"/><path d="M4 52Q20 48 36 52T68 52T100 52"/><path d="M4 63Q20 59 36 63T68 63T100 63"/><path d="M4 74Q20 70 36 74T68 74T100 74"/></g>
+<path d="M32 24H82Q88 24 88 30V72Q88 78 82 78H32L10 51Z" fill="none" stroke="#2B1F17" stroke-width="2.8" stroke-linejoin="round"/>
+<path d="M22 51a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" fill="none" stroke="#2B1F17" stroke-width="2.6"/>
+</g>
+<path d="M26.6 46.2C19 36 15 23 22.4 13.6C28 6.8 38 9.6 34.4 17.6" fill="none" stroke="#2B1F17" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
