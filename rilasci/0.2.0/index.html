@@ -1196,6 +1196,20 @@ body.trascino::after {
     return raccolti;
   }
 
+  /**
+   * Il browser ricorda l'ultima posizione di ogni finestra di scelta grazie a un "id".
+   * Se quel ricordo si confonde (Edge, su Mac, ha dato "TypeMismatchError"),
+   * riproviamo una volta senza ricordo.
+   */
+  async function conRiprova(apri, id) {
+    try {
+      return await apri({ id });
+    } catch (e) {
+      if (e && (e.name === "TypeMismatchError" || e.name === "NotFoundError")) return apri({});
+      throw e;
+    }
+  }
+
   const puoScegliereCartelle = () => typeof radice.showDirectoryPicker === "function";
   const puoScegliereFile = () => typeof radice.showOpenFilePicker === "function";
 
@@ -1203,7 +1217,7 @@ body.trascino::after {
   async function scegliCartella(avanzamento) {
     let cartella;
     try {
-      cartella = await radice.showDirectoryPicker({ id: "tagliatelle", mode: "read" });
+      cartella = await conRiprova((opzioni) => radice.showDirectoryPicker({ ...opzioni, mode: "read" }), "tagliatelle-cartelle");
     } catch (e) {
       if (e && e.name === "AbortError") return { nome: null, file: [] };
       throw e;
@@ -1217,10 +1231,10 @@ body.trascino::after {
     if (puoScegliereFile()) {
       let maniglie;
       try {
-        maniglie = await radice.showOpenFilePicker({
-          id: "tagliatelle", multiple: true,
+        maniglie = await conRiprova((opzioni) => radice.showOpenFilePicker({
+          ...opzioni, multiple: true,
           types: [{ description: "File audio MP3 e FLAC", accept: { "audio/mpeg": [".mp3"], "audio/flac": [".flac"] } }],
-        });
+        }), "tagliatelle-file");
       } catch (e) {
         if (e && e.name === "AbortError") return [];
         throw e;
@@ -1328,11 +1342,11 @@ body.trascino::after {
 
   // ---------- Messaggio breve in basso ----------
   let timerMessaggio;
-  function avvisa(testo) {
+  function avvisa(testo, durata = 3800) {
     const m = $("#messaggio");
     m.textContent = testo; m.hidden = false;
     clearTimeout(timerMessaggio);
-    timerMessaggio = setTimeout(() => (m.hidden = true), 3800);
+    timerMessaggio = setTimeout(() => (m.hidden = true), durata);
   }
 
   // ---------- Preferenze (salvate solo in questo browser) ----------
@@ -1460,9 +1474,11 @@ body.trascino::after {
     try { await azione(); }
     catch (e) {
       console.error(e);
-      avvisa(e && e.name === "NotAllowedError"
+      const tecnico = ((e && e.name) || "Errore") + ": " + ((e && e.message) || String(e));
+      const testo = e && e.name === "NotAllowedError"
         ? "Il browser non ha dato il permesso di leggere i file."
-        : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.");
+        : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.";
+      avvisa(testo + " (Dettagli tecnici: " + tecnico + ")", 15000);
     }
   }
   $("#apri-cartella").addEventListener("click", () => conErrori(async () => {

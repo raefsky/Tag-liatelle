@@ -28,6 +28,20 @@
     return raccolti;
   }
 
+  /**
+   * Il browser ricorda l'ultima posizione di ogni finestra di scelta grazie a un "id".
+   * Se quel ricordo si confonde (Edge, su Mac, ha dato "TypeMismatchError"),
+   * riproviamo una volta senza ricordo.
+   */
+  async function conRiprova(apri, id) {
+    try {
+      return await apri({ id });
+    } catch (e) {
+      if (e && (e.name === "TypeMismatchError" || e.name === "NotFoundError")) return apri({});
+      throw e;
+    }
+  }
+
   const puoScegliereCartelle = () => typeof radice.showDirectoryPicker === "function";
   const puoScegliereFile = () => typeof radice.showOpenFilePicker === "function";
 
@@ -35,7 +49,7 @@
   async function scegliCartella(avanzamento) {
     let cartella;
     try {
-      cartella = await radice.showDirectoryPicker({ id: "tagliatelle", mode: "read" });
+      cartella = await conRiprova((opzioni) => radice.showDirectoryPicker({ ...opzioni, mode: "read" }), "tagliatelle-cartelle");
     } catch (e) {
       if (e && e.name === "AbortError") return { nome: null, file: [] };
       throw e;
@@ -49,10 +63,10 @@
     if (puoScegliereFile()) {
       let maniglie;
       try {
-        maniglie = await radice.showOpenFilePicker({
-          id: "tagliatelle", multiple: true,
+        maniglie = await conRiprova((opzioni) => radice.showOpenFilePicker({
+          ...opzioni, multiple: true,
           types: [{ description: "File audio MP3 e FLAC", accept: { "audio/mpeg": [".mp3"], "audio/flac": [".flac"] } }],
-        });
+        }), "tagliatelle-file");
       } catch (e) {
         if (e && e.name === "AbortError") return [];
         throw e;

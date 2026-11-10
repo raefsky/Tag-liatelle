@@ -46,11 +46,11 @@
 
   // ---------- Messaggio breve in basso ----------
   let timerMessaggio;
-  function avvisa(testo) {
+  function avvisa(testo, durata = 3800) {
     const m = $("#messaggio");
     m.textContent = testo; m.hidden = false;
     clearTimeout(timerMessaggio);
-    timerMessaggio = setTimeout(() => (m.hidden = true), 3800);
+    timerMessaggio = setTimeout(() => (m.hidden = true), durata);
   }
 
   // ---------- Preferenze (salvate solo in questo browser) ----------
@@ -178,9 +178,11 @@
     try { await azione(); }
     catch (e) {
       console.error(e);
-      avvisa(e && e.name === "NotAllowedError"
+      const tecnico = ((e && e.name) || "Errore") + ": " + ((e && e.message) || String(e));
+      const testo = e && e.name === "NotAllowedError"
         ? "Il browser non ha dato il permesso di leggere i file."
-        : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.");
+        : "Qualcosa è andato storto durante l'apertura. I tuoi file non sono stati toccati.";
+      avvisa(testo + " (Dettagli tecnici: " + tecnico + ")", 15000);
     }
   }
   $("#apri-cartella").addEventListener("click", () => conErrori(async () => {
