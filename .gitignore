@@ -1,0 +1,18 @@
+# file del Mac
+.DS_Store
+
+# impostazioni locali di Claude Code (server di anteprima)
+.claude/
+
+# copie di sicurezza create dall'app
+Tag-liatelle copie/
+
+# per sicurezza: nessun file audio vero nel repository,
+# tranne i file di prova in esempi/
+*.mp3
+*.flac
+*.m4a
+*.ogg
+*.opus
+!esempi/**/*.mp3
+!esempi/**/*.flac
