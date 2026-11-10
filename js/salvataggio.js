@@ -153,6 +153,13 @@
     if (riletto.avvisi.length) problemi.push("il tag scritto non si rilegge bene");
     if (JSON.stringify(ordina(riletto.campi)) !== JSON.stringify(ordina(attesi))) problemi.push("i campi riletti non sono quelli voluti");
     if ((await impronta(dopo.slice(riletto.audio.inizio, riletto.audio.fine))) !== improntaAudio) problemi.push("l'audio non è identico a prima");
+    // il tag sul disco deve essere esattamente quello preparato (campi, copertina, tutto)
+    const testa = new Uint8Array(await dopo.slice(0, nuovo.tag.length).arrayBuffer());
+    if (testa.length !== nuovo.tag.length || testa.some((x, i) => x !== nuovo.tag[i])) problemi.push("il tag sul disco non è quello preparato");
+    if (nuovo.v1) {
+      const coda = new Uint8Array(await dopo.slice(dopo.size - 128).arrayBuffer());
+      if (coda.some((x, i) => x !== nuovo.v1[i])) problemi.push("il vecchio tag ID3v1 non è quello preparato");
+    }
     if (problemi.length) {
       // qualcosa non torna: si rimette subito la copia
       await scriviFile(maniglia, copiaScritta);

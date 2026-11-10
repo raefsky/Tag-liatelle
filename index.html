@@ -111,7 +111,7 @@
   <span>© Roberto Lanza · licenza <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.it" rel="license noopener" target="_blank">CC BY-NC-SA 4.0</a></span>
   <span>Tutto avviene sul tuo computer: nessun file viene caricato su internet.</span>
   <span>Funziona al completo in Chrome ed Edge.</span>
-  <span>versione <span id="versione">0.3.0</span></span>
+  <span>versione <span id="versione">0.4.0</span></span>
 </footer>
 
 <!-- Finestrella delle scorciatoie -->
@@ -145,6 +145,41 @@
   </p>
 </dialog>
 
+<!-- Ritaglio della copertina -->
+<dialog id="ritaglio" aria-labelledby="titolo-ritaglio" class="largo">
+  <h2 id="titolo-ritaglio">Nuova copertina</h2>
+  <div class="ritaglio">
+    <div class="vista-ritaglio">
+      <canvas id="vista" width="360" height="360" tabindex="0" aria-label="Il quadrato della copertina. Trascina per spostare l'immagine, usa la rotellina o i tasti più e meno per lo zoom, le frecce per spostarla."></canvas>
+      <p class="nota-piccola">Trascina per spostare · rotellina o + e − per lo zoom</p>
+    </div>
+    <div class="comandi-ritaglio">
+      <p id="ritaglio-partenza" class="nota-piccola"></p>
+      <label class="riga-zoom">Zoom <input type="range" id="zoom" min="1" max="4" step="0.01" value="1"></label>
+      <button class="bottone leggero" type="button" id="ritaglio-centra">Centra di nuovo</button>
+      <fieldset>
+        <legend>Misura (pixel per lato)</legend>
+        <label><input type="radio" name="lato" value="500"> 500</label>
+        <label><input type="radio" name="lato" value="1000" checked> 1000</label>
+        <label><input type="radio" name="lato" value="1400"> 1400</label>
+        <label><input type="radio" name="lato" value="3000"> 3000</label>
+      </fieldset>
+      <fieldset>
+        <legend>Formato</legend>
+        <label><input type="radio" name="formato" value="image/jpeg" checked> JPEG <small>(leggero, va bene per le foto)</small></label>
+        <label><input type="radio" name="formato" value="image/png"> PNG <small>(senza perdita, più pesante)</small></label>
+      </fieldset>
+      <label id="riga-qualita" class="riga-zoom">Qualità JPEG <input type="range" id="qualita" min="60" max="100" step="1" value="90"> <output id="qualita-valore">90</output></label>
+      <p id="risultato" class="risultato"></p>
+      <ul id="avvisi-copertina" class="avvisi-copertina"></ul>
+    </div>
+  </div>
+  <p class="bottoni-dialogo">
+    <button class="bottone" type="button" id="ritaglio-annulla">Annulla</button>
+    <button class="bottone principale" type="button" id="ritaglio-usa">Usa questa copertina</button>
+  </p>
+</dialog>
+
 <!-- Conferma per le azioni delicate -->
 <dialog id="conferma" aria-labelledby="conferma-titolo">
   <h2 id="conferma-titolo"></h2>
@@ -161,9 +196,11 @@
 <script src="js/campi.js"></script>
 <script src="js/id3.js"></script>
 <script src="js/id3-scrittura.js"></script>
+<script src="js/immagini.js"></script>
 <script src="js/supporto.js"></script>
 <script src="js/apertura.js"></script>
 <script src="js/salvataggio.js"></script>
+<script src="js/ritaglio.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -134,7 +134,7 @@ def main():
     with tempfile.TemporaryDirectory() as cartella:
         for nome, s in sorted((scritti or {}).items()):
             dati = base64.b64decode(s["base64"])
-            percorso = Path(cartella) / nome
+            percorso = Path(cartella) / nome.replace("#", "-")
             percorso.write_bytes(dati)
             problemi = []
             loro = lettura_mutagen(str(percorso))
@@ -142,6 +142,8 @@ def main():
                 for k in sorted(set(s["campi"]) | set(loro["campi"])):
                     if s["campi"].get(k) != loro["campi"].get(k):
                         problemi.append(f"{k}: atteso {s['campi'].get(k)!r}, mutagen {loro['campi'].get(k)!r}")
+            if "immagini" in s and loro["immagini"] != s["immagini"]:
+                problemi.append(f"immagini: attese {s['immagini']}, mutagen {loro['immagini']}")
             from mutagen.id3 import ID3
             versione = "2.%d" % ID3(str(percorso), load_v1=False).version[1]
             if versione != s["versione"]:
@@ -152,7 +154,7 @@ def main():
                 b = dati[6:10]
                 inizio = 10 + ((b[0] << 21) | (b[1] << 14) | (b[2] << 7) | b[3])
             fine = len(dati) - 128 if dati[-128:-125] == b"TAG" else len(dati)
-            originale = (RADICE / "esempi" / nome).read_bytes()[s["audio"]["inizio"]:s["audio"]["fine"]]
+            originale = (RADICE / "esempi" / nome.split("#")[0]).read_bytes()[s["audio"]["inizio"]:s["audio"]["fine"]]
             if dati[inizio:fine] != originale:
                 problemi.append("l'audio NON è identico all'originale")
             if problemi:

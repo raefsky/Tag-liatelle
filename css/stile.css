@@ -415,7 +415,7 @@ kbd {
 
 /* mentre si trascinano file sulla pagina */
 body.trascino::after {
-  content: "Lascia qui i file o la cartella";
+  content: "Lascia qui i file, la cartella o una copertina";
   position: fixed; inset: 12px; z-index: 30;
   display: grid; place-items: center;
   font: 650 1.6rem var(--f-titoli); color: var(--inchiostro);
@@ -482,3 +482,36 @@ body.trascino::after {
 
 @media (max-width: 860px) { .timbro { right: 160px; top: 130px; font-size: 1.2rem; } }
 @media (max-width: 520px) { .timbro { right: 24px; top: 250px; } }
+
+/* ==========================================================================
+   Blocco 4: copertina
+   ========================================================================== */
+.ritaglio { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+.vista-ritaglio canvas {
+  display: block; width: 360px; height: 360px; max-width: 100%;
+  border: 1.5px solid var(--inchiostro); cursor: grab; touch-action: none;
+  background: #FFF;
+}
+.vista-ritaglio canvas:active { cursor: grabbing; }
+.vista-ritaglio .nota-piccola { margin-top: 6px; }
+.comandi-ritaglio fieldset { border: 1.5px dotted var(--riga); margin: 12px 0 0; padding: 6px 10px 8px; }
+.comandi-ritaglio legend { font-size: 0.75rem; letter-spacing: .07em; text-transform: uppercase; color: var(--inchiostro-tenue); }
+.comandi-ritaglio fieldset label { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; }
+.comandi-ritaglio small { color: var(--inchiostro-tenue); }
+.riga-zoom { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.riga-zoom input[type="range"] { flex: 1; accent-color: var(--uovo); }
+.riga-zoom[hidden] { display: none; }
+#ritaglio-centra { margin-top: 8px; padding: 5px 10px; font-size: 0.85rem; }
+.risultato { font-weight: 700; margin: 14px 0 6px; }
+.avvisi-copertina { margin: 0; padding-left: 1.2em; color: var(--timbro); font-size: 0.9rem; }
+@media (max-width: 760px) { .ritaglio { grid-template-columns: 1fr; } }
+
+/* comandi sotto la foto della scheda */
+.comandi-foto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.comandi-foto .bottone { padding: 4px 8px; font-size: 0.78rem; box-shadow: none; }
+.copertina.cambiata figcaption:first-of-type { color: var(--inchiostro); font-weight: 700; }
+.foto.tolta { background-image: repeating-linear-gradient(45deg, transparent 0 7px, var(--riga) 7px 8px); }
+
+/* caselle, scelte e cursori con il colore dell'accento */
+input[type="radio"], input[type="checkbox"], input[type="range"] { accent-color: var(--uovo); }
+.vista-ritaglio canvas { height: auto; aspect-ratio: 1; }
