@@ -1196,18 +1196,62 @@ body.trascino::after {
     return raccolti;
   }
 
-  /**
-   * Il browser ricorda l'ultima posizione di ogni finestra di scelta grazie a un "id"
-   * (uno per le cartelle, uno per i file). Se il ricordo punta a un posto che non
-   * esiste più ("NotFoundError"), riproviamo una volta senza ricordo.
-   */
-  async function conRiprova(apri, id) {
+  // ------------------------------------------------------------------
+  // Memoria dell'ultima posizione
+  // Il browser dovrebbe ricordarla da solo (grazie all'"id" della finestra),
+  // ma con la pagina aperta da un file (file://) Edge e Chrome non lo fanno.
+  // Quindi ricordiamo noi l'ultimo file e l'ultima cartella scelti e li
+  // passiamo come punto di partenza ("startIn"). Il ricordo resta solo
+  // in questo browser, su questo computer (IndexedDB), e non contiene i file.
+  // ------------------------------------------------------------------
+  const memoria = { file: null, cartella: null };
+  const DB = "tagliatelle", NEGOZIO = "posizioni";
+
+  function apriDb() {
+    return new Promise((ok, ko) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(NEGOZIO);
+      r.onsuccess = () => ok(r.result);
+      r.onerror = () => ko(r.error);
+    });
+  }
+  async function ricordaPosizione(tipo, maniglia) {
+    if (!maniglia) return;
+    memoria[tipo] = maniglia;
     try {
-      return await apri({ id });
-    } catch (e) {
-      if (e && e.name === "NotFoundError") return apri({});
-      throw e;
+      const db = await apriDb();
+      db.transaction(NEGOZIO, "readwrite").objectStore(NEGOZIO).put(maniglia, tipo);
+    } catch (e) { /* senza memoria si va avanti lo stesso */ }
+  }
+  // i ricordi si caricano subito all'apertura della pagina: al clic sul pulsante
+  // non c'è tempo per aspettare (il browser vuole aprire la finestra all'istante)
+  (async () => {
+    try {
+      const db = await apriDb();
+      for (const tipo of ["file", "cartella"]) {
+        const r = db.transaction(NEGOZIO, "readonly").objectStore(NEGOZIO).get(tipo);
+        r.onsuccess = () => { if (r.result && !memoria[tipo]) memoria[tipo] = r.result; };
+      }
+    } catch (e) { /* nessun ricordo: pazienza */ }
+  })();
+  const posizione = (tipo) => memoria[tipo];
+
+  /**
+   * Apre una finestra di scelta partendo dall'ultima posizione ricordata.
+   * Se quella posizione non esiste più (file spostato o cancellato),
+   * riprova partendo dalla posizione predefinita.
+   */
+  async function conPosizione(apri, tipo, id) {
+    const partenza = posizione(tipo) || posizione(tipo === "cartella" ? "file" : "cartella");
+    if (partenza) {
+      try {
+        return await apri({ startIn: partenza });
+      } catch (e) {
+        if (e && (e.name === "AbortError" || e.name === "TypeMismatchError")) throw e;
+        // ricordo non più valido: si riparte senza
+      }
     }
+    return apri({ id });
   }
 
   const puoScegliereCartelle = () => typeof radice.showDirectoryPicker === "function";
@@ -1217,11 +1261,12 @@ body.trascino::after {
   async function scegliCartella(avanzamento) {
     let cartella;
     try {
-      cartella = await conRiprova((opzioni) => radice.showDirectoryPicker({ ...opzioni, mode: "read" }), "tagliatelle-cartelle");
+      cartella = await conPosizione((opzioni) => radice.showDirectoryPicker({ ...opzioni, mode: "read" }), "cartella", "tagliatelle-cartelle");
     } catch (e) {
       if (e && e.name === "AbortError") return { nome: null, file: [] };
       throw e;
     }
+    ricordaPosizione("cartella", cartella);
     const file = await esplora(cartella, "", [], avanzamento);
     return { nome: cartella.name, file };
   }
@@ -1231,14 +1276,15 @@ body.trascino::after {
     if (puoScegliereFile()) {
       let maniglie;
       try {
-        maniglie = await conRiprova((opzioni) => radice.showOpenFilePicker({
+        maniglie = await conPosizione((opzioni) => radice.showOpenFilePicker({
           ...opzioni, multiple: true,
           types: [{ description: "File audio MP3 e FLAC", accept: { "audio/mpeg": [".mp3"], "audio/flac": [".flac"] } }],
-        }), "tagliatelle-file");
+        }), "file", "tagliatelle-file");
       } catch (e) {
         if (e && e.name === "AbortError") return [];
         throw e;
       }
+      ricordaPosizione("file", maniglie[0]);
       const out = [];
       for (const m of maniglie) out.push({ nome: m.name, percorso: m.name, file: await m.getFile(), maniglia: m, formato: formatoDi(m.name) });
       return out;
@@ -1277,6 +1323,7 @@ body.trascino::after {
       if (maniglia && maniglia.kind === "directory") {
         await esplora(maniglia, maniglia.name + "/", raccolti, avanzamento);
       } else if (maniglia && ESTENSIONI.test(maniglia.name)) {
+        ricordaPosizione("file", maniglia);
         raccolti.push({ nome: maniglia.name, percorso: maniglia.name, file: await maniglia.getFile(), maniglia, formato: formatoDi(maniglia.name) });
       } else if (fileSemplici[k]) {
         raccolti.push(...daFile([fileSemplici[k]]));
@@ -1705,6 +1752,7 @@ body.trascino::after {
         el("ul", {},
           el("li", { testo: "I file vengono letti e modificati qui, nel tuo browser: non vengono mai caricati su internet." }),
           el("li", { testo: "Non servono account né iscrizioni, e non c'è nessuna statistica sul tuo uso." }),
+          el("li", { testo: "Ricorda soltanto l'ultima cartella da cui hai aperto i file, per ripartire da lì: il ricordo resta in questo browser." }),
           el("li", { testo: "Caratteri e programmi sono già dentro la pagina: funziona anche senza connessione." }),
           el("li", { testo: "Prima di scrivere in un file, Tag-liatelle ne fa una copia di sicurezza accanto all'originale." })
         )

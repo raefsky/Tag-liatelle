@@ -409,6 +409,7 @@
         el("ul", {},
           el("li", { testo: "I file vengono letti e modificati qui, nel tuo browser: non vengono mai caricati su internet." }),
           el("li", { testo: "Non servono account né iscrizioni, e non c'è nessuna statistica sul tuo uso." }),
+          el("li", { testo: "Ricorda soltanto l'ultima cartella da cui hai aperto i file, per ripartire da lì: il ricordo resta in questo browser." }),
           el("li", { testo: "Caratteri e programmi sono già dentro la pagina: funziona anche senza connessione." }),
           el("li", { testo: "Prima di scrivere in un file, Tag-liatelle ne fa una copia di sicurezza accanto all'originale." })
         )
