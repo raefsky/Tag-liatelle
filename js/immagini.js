@@ -146,11 +146,11 @@
     return new Uint8Array(await blob.arrayBuffer());
   }
 
-  /** Avvisi sul risultato e sull'immagine di partenza. */
+  /** Avvisi sul risultato. "latoPartenza" è il lato, in pixel originali, del quadrato ritagliato. */
   function avvisi({ latoPartenza, lato, byte }) {
     const out = [];
     if (latoPartenza && latoPartenza < lato) {
-      out.push(`L'immagine di partenza è piccola (il lato corto è di ${latoPartenza} pixel): ingrandita a ${lato} pixel sarà un po' sfocata.`);
+      out.push(`La parte scelta dell'immagine misura ${latoPartenza} pixel per lato: ingrandita a ${lato} pixel sarà un po' sfocata. Riduci lo zoom o scegli una misura più piccola.`);
     }
     if (lato < SOGLIE.troppoPiccola || (latoPartenza && latoPartenza < SOGLIE.troppoPiccola)) {
       out.push(`Sotto i ${SOGLIE.troppoPiccola} pixel la copertina sembra sgranata in molti lettori e negozi online.`);

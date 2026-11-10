@@ -34,3 +34,19 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
 - La versione dei tag resta quella del file. I file senza tag, con ID3v2.2 o con il solo ID3v1 ricevono un tag ID3v2.3.
 - **Ripristino**: nella scheda, sotto "Copie di sicurezza", ci sono i pulsanti "Torna all'originale" e "Torna a prima dell'ultimo salvataggio". Anche il ripristino si può annullare, perché la versione attuale diventa la nuova copia "ultima".
 - **Safari e Firefox**: al posto di "Salva" c'è "Scarica la copia modificata". L'originale non viene toccato.
+
+## Copertina (dalla versione 0.4.0)
+- Sotto la foto della scheda ci sono quattro pulsanti:
+  - **Cambia…** (o **Aggiungi…** se la copertina non c'è): sceglie un'immagine JPEG, PNG, WebP o GIF;
+  - **Ritaglia…**: rifà il ritaglio della copertina attuale;
+  - **Esporta**: scarica la copertina com'è nel file;
+  - **Rimuovi**: toglie la copertina.
+- Si può anche **trascinare un'immagine** sulla pagina: diventa la copertina della scheda aperta.
+- Nella finestra di ritaglio:
+  - si sposta l'immagine trascinandola o con le frecce;
+  - si ingrandisce con la rotellina, con il cursore dello zoom o con i tasti + e −;
+  - si sceglie la misura (500, 1000, 1400 o 3000 pixel) e il formato: JPEG, con qualità regolabile, oppure PNG.
+- I JPEG sono di tipo "base" (non progressivo), a colori RGB: è il formato che tutti i lettori capiscono.
+- Avvisi: se la parte ritagliata è più piccola della misura scelta (verrà sfocata), se la copertina è sotto i 500 pixel, se pesa più di 1 MB.
+- La copertina cambia solo quando si salva, con la stessa anteprima e la stessa copia di sicurezza dei campi. Le altre immagini del file (retro, libretto…) restano.
+- La stessa copertina su più tracce insieme arriverà con la modifica a gruppi (blocco 7).

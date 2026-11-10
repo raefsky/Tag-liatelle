@@ -212,6 +212,15 @@
     profondita = 0;
     document.body.classList.remove("trascino");
     const dt = e.dataTransfer;
+    // un'immagine trascinata diventa la copertina della scheda aperta
+    const files = Array.from(dt.files || []);
+    const imm = files.find((f) => /^image\//.test(f.type));
+    if (imm && !files.some((f) => /\.(mp3|flac)$/i.test(f.name))) {
+      const t = tracce[corrente];
+      if (t && document.querySelector('[data-trascina-immagine="si"]')) ritaglia(t, imm);
+      else avvisa("Per cambiare la copertina, apri prima una scheda che si può modificare.");
+      return;
+    }
     conErrori(async () => aggiungi(await Apertura.daTrascinamento(dt)));
   });
 
@@ -278,6 +287,7 @@
 
     const l = t.lettura;
     const campi = (l && l.campi) || {};
+    if (!t.modifiche) t.modifiche = {};
     const numeroScheda = String(corrente + 1).padStart(3, "0");
     const versione = !l ? "" : l.tag ? "ID3v" + l.tag.versione + (l.v1 ? " + ID3v1" : "") : l.v1 ? "solo ID3v1" : "nessun tag";
     const inventario = [`Scheda n. ${numeroScheda}`, t.formato, versione, misura(t.file.size)].filter(Boolean).join(" · ");
@@ -290,7 +300,7 @@
           el("p", { testo: campi.artista || "" }),
           el("p", { classe: "nome-file", testo: t.percorso })
         ),
-        fotoCopertina(l)
+        fotoCopertina(l, t)
       )
     );
 
@@ -336,24 +346,89 @@
 
   const vuoto = (v) => v == null || v === "" || (Array.isArray(v) && v.every((x) => !x));
 
-  function fotoCopertina(l) {
+  /** La fotografia incollata sulla scheda, con i comandi della copertina se il file si può modificare. */
+  function fotoCopertina(l, t) {
     const imm = (l && l.immagini) || [];
     const fronte = imm.find((i) => i.tipo === 3) || imm[0];
-    if (!fronte) return el("div", { classe: "foto", role: "img", "aria-label": "Nessuna copertina" }, el("span", { testo: "nessuna copertina" }));
-    const url = URL.createObjectURL(new Blob([fronte.dati], { type: fronte.mime }));
+    const modifica = t && t.modifiche && t.modifiche.copertina;
+    const modificabile = t && t.formato === "MP3" && t.stato === "letto" && l && Id3Scrittura.controlla(l).ok;
+    const altre = imm.filter((i) => i !== fronte);
+    const restano = modifica ? imm.filter((i) => i.tipo !== 3 && !(modifica.azione === "rimuovi" && i === fronte)) : altre;
+
+    let foto, didascalia;
+    if (modifica && modifica.azione === "sostituisci") {
+      foto = el("div", { classe: "foto" }, immagine(modifica.dati, modifica.mime, "Nuova copertina"));
+      didascalia = el("figcaption", { testo: `Nuova copertina · ${modifica.lato} × ${modifica.lato} px · ${nomeFormatoImmagine(modifica.mime)} · ${misura(modifica.byte)} · da salvare` });
+    } else if (modifica && modifica.azione === "rimuovi") {
+      foto = el("div", { classe: "foto tolta", role: "img", "aria-label": "Copertina da togliere" }, el("span", { testo: "verrà tolta" }));
+      didascalia = el("figcaption", { testo: "La copertina verrà tolta al salvataggio." });
+    } else if (fronte) {
+      const img = immagine(fronte.dati, fronte.mime, nomeTipo(fronte.tipo));
+      foto = el("div", { classe: "foto" }, img);
+      didascalia = el("figcaption", { testo: `${nomeTipo(fronte.tipo)} · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}` });
+      img.addEventListener("load", () => {
+        didascalia.textContent = `${nomeTipo(fronte.tipo)} · ${img.naturalWidth} × ${img.naturalHeight} px · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}`;
+      });
+    } else {
+      foto = el("div", { classe: "foto", role: "img", "aria-label": "Nessuna copertina" }, el("span", { testo: "nessuna copertina" }));
+      didascalia = null;
+    }
+
+    const comandi = modificabile ? el("div", { classe: "comandi-foto" },
+      el("button", { classe: "bottone leggero", type: "button", suclick: () => scegliImmagine(t) }, fronte || modifica ? "Cambia…" : "Aggiungi…"),
+      fronte && !modifica ? el("button", { classe: "bottone leggero", type: "button", suclick: () => ritaglia(t, new Blob([fronte.dati], { type: fronte.mime })), title: "Ritaglia o ridimensiona la copertina attuale" }, "Ritaglia…") : null,
+      fronte && !modifica ? el("button", { classe: "bottone leggero", type: "button", suclick: () => esportaCopertina(t, fronte) }, "Esporta") : null,
+      fronte && !modifica ? el("button", { classe: "bottone leggero pericolo", type: "button", suclick: () => impostaCopertina(t, { azione: "rimuovi" }) }, "Rimuovi") : null,
+      modifica ? el("button", { classe: "bottone leggero", type: "button", suclick: () => impostaCopertina(t, null) }, "Tieni quella di prima") : null
+    ) : fronte ? el("div", { classe: "comandi-foto" }, el("button", { classe: "bottone leggero", type: "button", suclick: () => esportaCopertina(t, fronte) }, "Esporta")) : null;
+
+    return el("figure", { classe: "copertina" + (modifica ? " cambiata" : ""), "data-trascina-immagine": modificabile ? "si" : null },
+      foto, didascalia,
+      restano.length ? el("figcaption", { testo: `${modifica ? (restano.length === 1 ? "Resta" : "Restano") : "Più"} ${restano.length} altr${restano.length === 1 ? "a immagine" : "e immagini"}: ${restano.map((i) => nomeTipo(i.tipo).toLowerCase()).join(", ")}` }) : null,
+      comandi);
+  }
+
+  function immagine(dati, mime, alt) {
+    const url = URL.createObjectURL(new Blob([dati], { type: mime }));
     indirizziImmagini.push(url);
-    const didascalia = el("figcaption", { testo: `${nomeTipo(fronte.tipo)} · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}` });
-    const img = el("img", { src: url, alt: nomeTipo(fronte.tipo) });
-    img.addEventListener("load", () => {
-      didascalia.textContent = `${nomeTipo(fronte.tipo)} · ${img.naturalWidth} × ${img.naturalHeight} px · ${nomeFormatoImmagine(fronte.mime)} · ${misura(fronte.byte)}`;
-    });
+    const img = el("img", { src: url, alt });
     img.addEventListener("error", () => { img.replaceWith(el("span", { testo: "immagine illeggibile" })); });
-    const altre = imm.length - 1;
-    return el("figure", { classe: "copertina" },
-      el("div", { classe: "foto" }, img),
-      didascalia,
-      altre > 0 ? el("figcaption", { testo: `più ${altre} altr${altre === 1 ? "a immagine" : "e immagini"}: ${imm.filter((i) => i !== fronte).map((i) => nomeTipo(i.tipo).toLowerCase()).join(", ")}` }) : null
-    );
+    return img;
+  }
+
+  // ---------- Copertina: scegliere, ritagliare, esportare, togliere ----------
+  function impostaCopertina(t, valore) {
+    if (valore) t.modifiche.copertina = valore;
+    else delete t.modifiche.copertina;
+    disegnaPila();
+    disegnaScheda();
+  }
+
+  function scegliImmagine(t) {
+    const campo = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/gif" });
+    campo.addEventListener("change", () => { if (campo.files[0]) ritaglia(t, campo.files[0]); });
+    campo.click();
+  }
+
+  async function ritaglia(t, blob) {
+    try {
+      const esito = await Ritaglio.apri(blob);
+      if (esito) {
+        impostaCopertina(t, { azione: "sostituisci", ...esito });
+        avvisa("Nuova copertina pronta: salva per scriverla nel file.");
+      }
+    } catch (e) {
+      avvisa((e && e.message) || "Non riesco ad aprire questa immagine.", 7000);
+    }
+  }
+
+  function esportaCopertina(t, fronte) {
+    const est = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" }[fronte.mime] || "img";
+    const base = t.nome.replace(/\.[^.]+$/, "");
+    const a = el("a", { href: URL.createObjectURL(new Blob([fronte.dati], { type: fronte.mime })), download: `${base} - copertina.${est}` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    avvisa("Ho esportato la copertina: la trovi tra i download.");
   }
 
   function riquadroAvvisi(righe) {
@@ -464,7 +539,7 @@
     if (!controllo.ok) { avvisa(controllo.motivo, 9000); return; }
     const corpo = $("#anteprima-corpo");
     corpo.replaceChildren();
-    const righe = Object.keys(t.modifiche).map((k) => {
+    const righe = Object.keys(t.modifiche).filter((k) => k !== "copertina").map((k) => {
       const campo = Campi.TUTTI.find((c) => c.id === k);
       const prima = mostraValore(l.campi[k]);
       const dopo = mostraValore(normale(t.modifiche[k]));
@@ -473,7 +548,21 @@
         el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(vuoto)" }),
         el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolto)" }));
     });
-    const note = [...controllo.note];
+    const cop = t.modifiche.copertina;
+    if (cop) {
+      const fronte = l.immagini.find((i) => i.tipo === 3) || (cop.azione === "rimuovi" ? l.immagini[0] : null);
+      const m = fronte && Immagini.misure(fronte.dati);
+      const prima = fronte ? `${nomeFormatoImmagine(fronte.mime)}${m && m.larghezza ? ` ${m.larghezza} × ${m.altezza} px` : ""}, ${misura(fronte.byte)}` : "";
+      const dopo = cop.azione === "rimuovi" ? "" : `${nomeFormatoImmagine(cop.mime)} ${cop.lato} × ${cop.lato} px, ${misura(cop.byte)}`;
+      righe.push(el("tr", {},
+        el("th", { scope: "row", testo: "Copertina" }),
+        el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(nessuna)" }),
+        el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolta)" })));
+    }
+    // la nota su ID3v1 serve solo se cambia un campo che ID3v1 contiene
+    const campiV1 = ["titolo", "artista", "album", "anno", "traccia", "genere"];
+    const note = controllo.note.filter((n) => !n.includes("ID3v1, alla fine") || campiV1.some((k) => k in t.modifiche));
+    if (cop) note.push("Le altre immagini del file (retro, libretto…) restano come sono.");
     if (t.maniglia) {
       note.unshift(`Prima di scrivere faccio una copia di sicurezza del file nella cartella «${Salvataggio.COPIE}», accanto al file.`);
       if (!t.radice && !t.accesso) note.unshift("Se il browser non conosce ancora la cartella di questo file, ti chiederò di sceglierla: serve per mettere lì la copia di sicurezza.");
@@ -497,7 +586,7 @@
     finestraAnteprima.showModal();
   }
 
-  const NOMI_PASSI = { controllo: "Controllo che il file non sia cambiato", copia: "Copia di sicurezza", scrittura: "Scrittura del nuovo tag", verifica: "Verifica: campi e audio identico" };
+  const NOMI_PASSI = { controllo: "Controllo che il file non sia cambiato", copia: "Copia di sicurezza", scrittura: "Scrittura del nuovo tag", verifica: "Verifica: tag riletto e audio identico" };
 
   async function eseguiSalvataggio(t) {
     salvataggioInCorso = true;
