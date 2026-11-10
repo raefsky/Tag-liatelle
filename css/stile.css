@@ -393,3 +393,35 @@ kbd {
 
 /* nella tabella dei browser il nome resta su una riga (sugli schermi larghi) */
 @media (min-width: 700px) { .compatibili tbody th { white-space: nowrap; padding-right: 18px; } }
+
+/* ==========================================================================
+   Blocco 2: file veri nella pila e nella scheda
+   ========================================================================== */
+.voce.problema .artista { color: var(--timbro); }
+
+/* copertina vera, con didascalia sotto come in un museo */
+.copertina { margin: 0; flex: none; width: 170px; }
+.copertina .foto { width: 100%; background-image: none; }
+.copertina figcaption { font-size: 0.75rem; color: var(--inchiostro-tenue); margin-top: 14px; line-height: 1.35; }
+.copertina figcaption + figcaption { margin-top: 4px; }
+
+.avviso-scheda { margin: 18px 0 0; }
+.avviso-scheda p { margin: 0 0 4px; }
+.conservati { display: flex; gap: 8px; align-items: flex-start; margin-top: 22px; font-size: 0.9rem; color: var(--inchiostro-tenue); }
+.conservati .icona { flex: none; margin-top: 1px; }
+.personalizzati dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 6px 0 0; }
+.personalizzati dt { font-weight: 700; }
+.personalizzati dd { margin: 0; border-bottom: 1.5px dotted var(--inchiostro-tenue); overflow-wrap: anywhere; }
+
+/* mentre si trascinano file sulla pagina */
+body.trascino::after {
+  content: "Lascia qui i file o la cartella";
+  position: fixed; inset: 12px; z-index: 30;
+  display: grid; place-items: center;
+  font: 650 1.6rem var(--f-titoli); color: var(--inchiostro);
+  background: var(--uovo-tenue);
+  border: 3px dashed var(--inchiostro);
+  opacity: .96;
+}
+@media (max-width: 860px) { .copertina { width: 120px; } }
+@media (max-width: 520px) { .copertina { width: 150px; } }
