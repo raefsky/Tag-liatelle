@@ -1,8 +1,8 @@
 /* ==========================================================================
    Tag-liatelle · interfaccia
-   Apre cartelle e file (con i pulsanti o trascinandoli), legge i tag MP3 e
-   mostra la pila di schede e la scheda grande. Per ora legge soltanto:
-   la modifica e il salvataggio arrivano nel blocco 3.
+   Apre cartelle e file (con i pulsanti o trascinandoli), legge i tag MP3,
+   mostra la pila di schede e la scheda grande; modifica il gruppo Base e
+   salva in modo sicuro (anteprima, copia di sicurezza, verifica, ripristino).
    ========================================================================== */
 (function () {
   "use strict";
@@ -245,7 +245,7 @@
         : t.stato === "lettura" ? "lettura…"
         : c.artista || "artista sconosciuto";
       lista.append(el("li", {},
-        el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : ""), type: "button", "aria-current": i === corrente ? "true" : false, suclick: () => apri(i) },
+        el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : "") + (quanteModifiche(t) ? " modificata" : ""), type: "button", "aria-current": i === corrente ? "true" : false, suclick: () => apri(i) },
           el("span", { classe: "numero", testo: (c.traccia && c.traccia[0]) || "–" }),
           el("span", { classe: "titolo", testo: c.titolo || t.nome }),
           el("span", { classe: "formato", testo: t.formato }),
@@ -305,21 +305,33 @@
     if (l && l.avvisi.length) c.append(riquadroAvvisi(l.avvisi));
     if (l && !l.tag && !l.v1) c.append(el("p", { classe: "nota-esempio", testo: "Questo file non ha ancora nessun tag: è una tagliatella senza etichetta." }));
 
+    const controllo = l ? Id3Scrittura.controlla(l) : { ok: false, motivo: "" };
+    const modificabile = t.formato === "MP3" && t.stato === "letto" && controllo.ok;
+    if (l && !controllo.ok && controllo.motivo) c.append(riquadroAvvisi([controllo.motivo]));
+    if (!t.modifiche) t.modifiche = {};
+
     for (const g of Campi.GRUPPI) {
       const pieni = g.campi.filter((campo) => vuoto(campi[campo.id]) === false).length;
-      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, campi[campo.id])));
+      const siModifica = modificabile && g.id === "base";
+      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, campi[campo.id], siModifica ? t : null)));
       if (g.id === "extra" && l && l.personalizzati.length) griglia.append(personalizzati(l.personalizzati));
       if (g.sempreAperto) {
         c.append(el("div", { classe: "gruppo" }, el("h3", { testo: g.nome }), griglia));
       } else {
         const conta = pieni + (g.id === "extra" && l ? l.personalizzati.length : 0);
         c.append(el("details", { classe: "gruppo" },
-          el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota + (conta ? ` · ${conta} compilat${conta === 1 ? "o" : "i"}` : "") })), griglia));
+          el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota + (conta ? ` · ${conta} compilat${conta === 1 ? "o" : "i"}` : "") })),
+          el("p", { classe: "nota-piccola", testo: "Per ora questi campi si possono solo leggere: la modifica arriva in una prossima versione." }),
+          griglia));
       }
     }
 
+    if (modificabile) c.append(barraSalva(t));
     if (l) c.append(riquadroConservati(l));
-    c.append(el("p", { classe: "nota-piccola", testo: "Per ora Tag-liatelle legge soltanto: la modifica e il salvataggio arrivano nella prossima versione." }));
+    const posto = el("div", { classe: "posto-copie" });
+    c.append(posto);
+    disegnaCopie(t, posto);
+    c.append(el("div", { classe: "timbro", id: "timbro", hidden: true, "aria-hidden": "true" }, "Salvato", el("small", { id: "timbro-data" })));
   }
 
   const vuoto = (v) => v == null || v === "" || (Array.isArray(v) && v.every((x) => !x));
@@ -364,30 +376,272 @@
       el("dl", {}, ...lista.flatMap((p) => [el("dt", { testo: p.nome }), el("dd", { testo: p.valore })])));
   }
 
-  function disegnaCampo(campo, valore) {
+  /**
+   * Un campo della scheda. Se "traccia" è data, il campo si può modificare:
+   * il valore mostrato è quello modificato, e ogni cambiamento finisce in traccia.modifiche.
+   */
+  function disegnaCampo(campo, originale, traccia) {
     const id = "campo-" + campo.id;
     const classi = "campo" + ({ largo: " largo", stretto: " stretto", quarto: " quarto" }[campo.larghezza] || "");
+    const modificato = traccia && campo.id in traccia.modifiche;
+    const valore = modificato ? traccia.modifiche[campo.id] : originale;
+    const sola = !traccia;
+    const segna = (nodo) => { nodo.classList.toggle("cambiato", !!(traccia && campo.id in traccia.modifiche)); };
+
     if (campo.tipo === "numero-di") {
       const [n, tot] = valore || ["", ""];
-      return el("div", { classe: classi, role: "group", "aria-labelledby": id + "-et" },
-        el("span", { classe: "etichetta", id: id + "-et", testo: campo.etichetta }),
-        el("span", { classe: "coppia" },
-          el("input", { id, value: n, readonly: true, inputmode: "numeric", "aria-label": campo.etichetta + ", numero" }),
-          el("span", { testo: "di" }),
-          el("input", { value: tot, readonly: true, inputmode: "numeric", "aria-label": campo.etichetta + ", totale" })
-        )
-      );
+      const box = el("div", { classe: classi, role: "group", "aria-labelledby": id + "-et" });
+      const a = el("input", { id, value: n, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", numero" });
+      const b = el("input", { value: tot, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", totale" });
+      if (traccia) for (const x of [a, b]) x.addEventListener("input", () => { cambia(traccia, campo.id, [a.value, b.value], originale); segna(box); });
+      box.append(el("span", { classe: "etichetta", id: id + "-et", testo: campo.etichetta }),
+        el("span", { classe: "coppia" }, a, el("span", { testo: "di" }), b));
+      segna(box);
+      return box;
     }
+    let campoInput;
     if (campo.tipo === "lungo") {
-      const area = el("textarea", { id, readonly: true, rows: 3 });
-      area.value = valore || "";
-      return el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), area);
+      campoInput = el("textarea", { id, readonly: sola, rows: 3 });
+      campoInput.value = valore || "";
+    } else if (campo.tipo === "si-no") {
+      campoInput = el("input", { id, value: vuoto(valore) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(valore).trim()) ? "sì" : "no", readonly: true });
+    } else {
+      campoInput = el("input", { id, value: valore || "", readonly: sola, autocomplete: "off", spellcheck: campo.id === "titolo" || campo.id === "album" ? "true" : "false" });
     }
-    if (campo.tipo === "si-no") {
-      return el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }),
-        el("input", { id, value: vuoto(valore) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(valore).trim()) ? "sì" : "no", readonly: true }));
+    const box = el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), campoInput);
+    if (traccia && campo.tipo !== "si-no") campoInput.addEventListener("input", () => { cambia(traccia, campo.id, campoInput.value, originale); segna(box); });
+    segna(box);
+    return box;
+  }
+
+  // ---------- Modifiche non ancora salvate ----------
+  const normale = (v) => (Array.isArray(v) ? [String(v[0] || "").trim(), String(v[1] || "").trim()] : String(v == null ? "" : v).trim());
+  const stessoValore = (a, b) => JSON.stringify(normale(a)) === JSON.stringify(normale(Array.isArray(a) || Array.isArray(b) ? (b || ["", ""]) : b));
+
+  function cambia(traccia, campo, valore, originale) {
+    const prima = Array.isArray(valore) ? originale || ["", ""] : originale || "";
+    if (stessoValore(valore, prima)) delete traccia.modifiche[campo];
+    else traccia.modifiche[campo] = valore;
+    aggiornaBarra(traccia);
+    aggiornaVoce(traccia);
+  }
+  const quanteModifiche = (t) => Object.keys(t.modifiche || {}).length;
+
+  function aggiornaVoce(traccia) {
+    const i = tracce.indexOf(traccia);
+    const voce = document.querySelectorAll(".voce")[i];
+    if (voce) voce.classList.toggle("modificata", quanteModifiche(traccia) > 0);
+  }
+
+  function barraSalva(t) {
+    const testo = el("span", { classe: "barra-testo" });
+    const salvaB = el("button", { classe: "bottone principale", type: "button", id: "bottone-salva", suclick: () => apriAnteprima(t) },
+      icona("timbro"), t.maniglia ? "Salva…" : "Scarica la copia modificata…");
+    const annulla = el("button", { classe: "bottone leggero", type: "button", id: "bottone-annulla", suclick: () => { t.modifiche = {}; disegnaPila(); disegnaScheda(); avvisa("Modifiche annullate: la scheda è tornata come il file."); } }, "Annulla le modifiche");
+    const barra = el("div", { classe: "barra-salva", id: "barra-salva" }, testo, el("span", { classe: "barra-bottoni" }, annulla, salvaB));
+    setTimeout(() => aggiornaBarra(t));
+    return barra;
+  }
+  function aggiornaBarra(t) {
+    const n = quanteModifiche(t);
+    const testo = document.querySelector(".barra-testo");
+    if (!testo) return;
+    testo.textContent = n ? `${n} ${n === 1 ? "modifica" : "modifiche"} non ancora ${n === 1 ? "salvata" : "salvate"}` : "Nessuna modifica";
+    $("#bottone-salva").disabled = !n;
+    $("#bottone-annulla").disabled = !n;
+    $("#barra-salva").classList.toggle("attiva", n > 0);
+  }
+
+  // ---------- Anteprima e salvataggio ----------
+  const mostraValore = (v) => (vuoto(v) ? "" : Array.isArray(v) ? (v[1] ? `${v[0]} di ${v[1]}` : v[0]) : String(v));
+  const finestraAnteprima = $("#anteprima");
+  let salvataggioInCorso = false;
+
+  function apriAnteprima(t) {
+    if (!quanteModifiche(t) || salvataggioInCorso) return;
+    const l = t.lettura;
+    const controllo = Id3Scrittura.controlla(l);
+    if (!controllo.ok) { avvisa(controllo.motivo, 9000); return; }
+    const corpo = $("#anteprima-corpo");
+    corpo.replaceChildren();
+    const righe = Object.keys(t.modifiche).map((k) => {
+      const campo = Campi.TUTTI.find((c) => c.id === k);
+      const prima = mostraValore(l.campi[k]);
+      const dopo = mostraValore(normale(t.modifiche[k]));
+      return el("tr", {},
+        el("th", { scope: "row", testo: campo ? campo.etichetta : k }),
+        el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(vuoto)" }),
+        el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolto)" }));
+    });
+    const note = [...controllo.note];
+    if (t.maniglia) {
+      note.unshift(`Prima di scrivere faccio una copia di sicurezza del file nella cartella «${Salvataggio.COPIE}», accanto al file.`);
+      if (!t.radice && !t.accesso) note.unshift("Se il browser non conosce ancora la cartella di questo file, ti chiederò di sceglierla: serve per mettere lì la copia di sicurezza.");
+      note.push("L'audio non viene toccato: dopo il salvataggio controllo che sia identico, byte per byte.");
+    } else {
+      note.unshift("Questo browser non può scrivere nei file: preparo una copia modificata da scaricare. L'originale resta com'è.");
     }
-    return el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), el("input", { id, value: valore || "", readonly: true }));
+    corpo.append(
+      el("p", { classe: "nome-file", testo: t.percorso }),
+      el("table", { classe: "confronto" },
+        el("thead", {}, el("tr", {}, el("th", { scope: "col", testo: "Campo" }), el("th", { scope: "col", testo: "Prima" }), el("th", { scope: "col", testo: "Dopo" }))),
+        el("tbody", {}, righe)),
+      el("ul", { classe: "note-salvataggio" }, note.map((n) => el("li", { testo: n }))),
+      el("ol", { classe: "passi", id: "passi", hidden: true })
+    );
+    $("#anteprima-conferma").textContent = t.maniglia ? "Scrivi nel file" : "Prepara e scarica";
+    $("#anteprima-conferma").disabled = false;
+    $("#anteprima-annulla").disabled = false;
+    $("#anteprima-annulla").textContent = "Annulla";
+    $("#anteprima-conferma").onclick = () => (t.maniglia ? eseguiSalvataggio(t) : eseguiScaricamento(t));
+    finestraAnteprima.showModal();
+  }
+
+  const NOMI_PASSI = { controllo: "Controllo che il file non sia cambiato", copia: "Copia di sicurezza", scrittura: "Scrittura del nuovo tag", verifica: "Verifica: campi e audio identico" };
+
+  async function eseguiSalvataggio(t) {
+    salvataggioInCorso = true;
+    $("#anteprima-conferma").disabled = true;
+    $("#anteprima-annulla").disabled = true;
+    const passi = $("#passi");
+    passi.hidden = false;
+    passi.replaceChildren();
+    let attuale = null;
+    const passo = (nome) => {
+      if (attuale) attuale.classList.add("fatto");
+      attuale = el("li", { testo: NOMI_PASSI[nome] || nome });
+      passi.append(attuale);
+    };
+    try {
+      const esito = await Salvataggio.salva(t, t.modifiche, passo);
+      if (attuale) attuale.classList.add("fatto");
+      t.file = esito.file;
+      t.lettura = esito.lettura;
+      t.modifiche = {};
+      t.ultimoSalvataggio = new Date();
+      finestraAnteprima.close();
+      ordina();
+      disegnaPila();
+      disegnaScheda();
+      imprimiTimbro();
+      avvisa(`Salvato. La copia di sicurezza è «${esito.copia}».`, 6000);
+    } catch (e) {
+      console.error(e);
+      if (attuale) attuale.classList.add("fallito");
+      const testo = e instanceof Salvataggio.ErroreChiaro ? e.message
+        : e && e.name === "NotAllowedError" ? "Il browser non ha dato il permesso di modificare il file. Il file non è stato toccato."
+        : `Il salvataggio non è riuscito (${(e && e.name) || "errore"}: ${(e && e.message) || e}). Se il problema è avvenuto durante la scrittura, il browser lascia intatto l'originale.`;
+      passi.append(el("li", { classe: "errore-passo", testo }));
+      $("#anteprima-annulla").disabled = false;
+      $("#anteprima-annulla").textContent = "Chiudi";
+    } finally {
+      salvataggioInCorso = false;
+    }
+  }
+
+  async function eseguiScaricamento(t) {
+    try {
+      const { blob } = await Salvataggio.copiaDaScaricare(t, t.modifiche);
+      const a = el("a", { href: URL.createObjectURL(blob), download: t.nome });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      finestraAnteprima.close();
+      avvisa("Ho preparato la copia modificata: la trovi tra i download. L'originale non è stato toccato.", 7000);
+    } catch (e) {
+      avvisa(e instanceof Salvataggio.ErroreChiaro ? e.message : "Non sono riuscito a preparare la copia: " + ((e && e.message) || e), 9000);
+    }
+  }
+
+  function imprimiTimbro() {
+    const t = $("#timbro");
+    if (!t) return;
+    $("#timbro-data").textContent = new Date().toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+    t.hidden = false;
+    t.classList.remove("impresso");
+    if (animazioniAttive()) { void t.offsetWidth; t.classList.add("impresso"); }
+  }
+
+  // ---------- Copie di sicurezza: promemoria, ripristino, eliminazione ----------
+  const dataOra = (d) => d.toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+
+  async function disegnaCopie(t, posto) {
+    if (!t.maniglia && !t.radice) return;
+    const info = await Salvataggio.copieDi(t);
+    if (!info || !info.elenco.length || !posto.isConnected) return;
+    const originale = info.elenco.find((x) => x.quale === "originale");
+    const ultima = info.elenco.find((x) => x.quale === "ultima");
+    const totale = info.elenco.reduce((s, x) => s + x.byte, 0);
+    posto.replaceChildren(el("section", { classe: "copie" },
+      el("h3", {}, icona("timbro"), "Copie di sicurezza"),
+      el("p", { classe: "promemoria", testo: info.elenco.length === 1
+        ? `Ricordati: hai una copia di sicurezza di questo file nella cartella «${Salvataggio.COPIE}» (${misura(totale)}). Se è tutto a posto, puoi cancellarla.`
+        : `Ricordati: hai due copie di sicurezza di questo file nella cartella «${Salvataggio.COPIE}» (${misura(totale)}). Se è tutto a posto, puoi cancellarle.` }),
+      el("ul", {}, info.elenco.map((x) => el("li", {},
+        el("b", { testo: x.quale === "originale" ? "Originale" : "Prima dell'ultimo salvataggio" }),
+        ` · ${dataOra(x.data)} · ${misura(x.byte)}`))),
+      el("p", { classe: "bottoni-copie" },
+        el("button", { classe: "bottone leggero", type: "button", suclick: () => Salvataggio.mostraCopie(info.cartella), title: "Si apre la finestra del Mac dentro la cartella delle copie: chiudila con Annulla" }, icona("cartella"), "Mostra le copie"),
+        originale ? el("button", { classe: "bottone leggero", type: "button", suclick: () => chiediRipristino(t, originale) }, "Torna all'originale…") : null,
+        ultima ? el("button", { classe: "bottone leggero", type: "button", suclick: () => chiediRipristino(t, ultima) }, "Torna a prima dell'ultimo salvataggio…") : null,
+        el("button", { classe: "bottone leggero pericolo", type: "button", suclick: () => chiediEliminazione(t, info) }, icona("chiudi"), "Elimina le copie di sicurezza…")
+      )
+    ));
+  }
+
+  async function chiediRipristino(t, copia) {
+    if (quanteModifiche(t)) { avvisa("Prima salva o annulla le modifiche in corso.", 6000); return; }
+    const quando = copia.quale === "originale" ? "com'era all'inizio, prima di Tag-liatelle" : "com'era prima dell'ultimo salvataggio";
+    const si = await chiedi({
+      titolo: "Ripristinare la copia?",
+      testo: `Il file «${t.nome}» tornerà ${quando} (copia del ${dataOra(copia.data)}). La versione di adesso diventa la copia «prima dell'ultimo salvataggio», così puoi ancora tornare indietro.`,
+      si: "Ripristina", no: "Annulla",
+    });
+    if (!si) return;
+    try {
+      const esito = await Salvataggio.ripristina(t, copia.quale);
+      t.file = esito.file; t.lettura = esito.lettura; t.modifiche = {};
+      ordina(); disegnaPila(); disegnaScheda();
+      avvisa("Fatto: il file è tornato com'era nella copia.", 6000);
+    } catch (e) {
+      avvisa(e instanceof Salvataggio.ErroreChiaro ? e.message : "Il ripristino non è riuscito: " + ((e && e.message) || e), 9000);
+    }
+  }
+
+  async function chiediEliminazione(t, info) {
+    const totale = info.elenco.reduce((s, x) => s + x.byte, 0);
+    const n = info.elenco.length;
+    const si = await chiedi({
+      titolo: "Eliminare le copie di sicurezza?",
+      testo: `Elimino ${n === 1 ? "la copia" : "le " + n + " copie"} di sicurezza di «${t.nome}» (${misura(totale)}). Le copie eliminate da qui NON finiscono nel Cestino e non si possono recuperare. Il brano invece resta com'è.`,
+      si: "Elimina definitivamente", no: "Annulla", pericolo: true,
+    });
+    if (!si) return;
+    try {
+      const tolte = await Salvataggio.eliminaCopie(t);
+      disegnaScheda();
+      avvisa(tolte === 1 ? "Ho eliminato 1 copia di sicurezza." : `Ho eliminato ${tolte} copie di sicurezza.`);
+    } catch (e) {
+      avvisa(e instanceof Salvataggio.ErroreChiaro ? e.message : "Non sono riuscito a eliminare le copie: " + ((e && e.message) || e), 9000);
+    }
+  }
+
+  /** Finestrella di conferma: risponde true solo se si preme il pulsante di conferma. */
+  function chiedi({ titolo, testo, si, no, pericolo = false }) {
+    const d = $("#conferma");
+    $("#conferma-titolo").textContent = titolo;
+    $("#conferma-testo").textContent = testo;
+    const bSi = $("#conferma-si"), bNo = $("#conferma-no");
+    bSi.textContent = si; bNo.textContent = no;
+    bSi.classList.toggle("pericolo", pericolo);
+    bSi.classList.toggle("principale", !pericolo);
+    return new Promise((risolvi) => {
+      const fine = (r) => { bSi.onclick = bNo.onclick = null; d.onclose = null; if (d.open) d.close(); risolvi(r); };
+      bSi.onclick = () => fine(true);
+      bNo.onclick = () => fine(false);
+      d.onclose = () => fine(false);
+      d.showModal();
+      bNo.focus(); // la scelta prudente è quella già selezionata
+    });
   }
 
   function apri(i) {
@@ -486,7 +740,9 @@
     const inCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.readOnly;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
-      avvisa("Il salvataggio arriva nella prossima versione: per ora Tag-liatelle legge soltanto.");
+      const t = tracce[corrente];
+      if (!t || !quanteModifiche(t)) avvisa("Non ci sono modifiche da salvare.");
+      else if (!finestraAnteprima.open) apriAnteprima(t);
       return;
     }
     if (e.altKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -501,6 +757,10 @@
   // ---------- Partenza ----------
   disegnaPila();
   disegnaScheda();
+
+  window.addEventListener("beforeunload", (e) => {
+    if (tracce.some((t) => quanteModifiche(t)) || salvataggioInCorso) { e.preventDefault(); e.returnValue = ""; }
+  });
 
   // per le prove automatiche: permette di aprire file senza le finestre di scelta
   window.TagLiatelle = { aggiungi, tracce: () => tracce };

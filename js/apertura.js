@@ -15,13 +15,15 @@
   const saltaCartella = (nome) => nome === CARTELLA_COPIE || nome.startsWith(".");
 
   /** Scende nelle sottocartelle e raccoglie i file audio. */
-  async function esplora(cartella, percorso, raccolti, avanzamento) {
+  // "radice" è la cartella scelta dall'utente; "dentro" il percorso a partire da lei:
+  // serviranno per arrivare alla cartella del file quando si salva
+  async function esplora(cartella, percorso, raccolti, avanzamento, radice = cartella, dentro = []) {
     for await (const voce of cartella.values()) {
       if (voce.kind === "directory") {
-        if (!saltaCartella(voce.name)) await esplora(voce, percorso + voce.name + "/", raccolti, avanzamento);
+        if (!saltaCartella(voce.name)) await esplora(voce, percorso + voce.name + "/", raccolti, avanzamento, radice, [...dentro, voce.name]);
       } else if (ESTENSIONI.test(voce.name) && !voce.name.startsWith("._")) {
         // i file "._qualcosa" sono metadati invisibili del Mac, non audio
-        raccolti.push({ nome: voce.name, percorso: percorso + voce.name, file: await voce.getFile(), maniglia: voce, formato: formatoDi(voce.name) });
+        raccolti.push({ nome: voce.name, percorso: percorso + voce.name, file: await voce.getFile(), maniglia: voce, formato: formatoDi(voce.name), radice, dentro });
         if (avanzamento) avanzamento(raccolti.length);
       }
     }

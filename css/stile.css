@@ -289,7 +289,7 @@ a:hover { text-decoration-color: currentColor; }
 
 /* ---------- Il timbro ---------- */
 .timbro {
-  position: absolute; right: 36px; bottom: 30px;
+  position: absolute; right: 250px; top: 150px; z-index: 2;
   font: 800 1.5rem/1 var(--f-titoli); letter-spacing: .12em; text-transform: uppercase;
   color: var(--timbro);
   border: 3px double var(--timbro);
@@ -425,3 +425,60 @@ body.trascino::after {
 }
 @media (max-width: 860px) { .copertina { width: 120px; } }
 @media (max-width: 520px) { .copertina { width: 150px; } }
+
+/* ==========================================================================
+   Blocco 3: modifica e salvataggio
+   ========================================================================== */
+/* campo modificato e non ancora salvato: sottolineatura gialla e segno a margine */
+.campo.cambiato label, .campo.cambiato .etichetta { color: var(--inchiostro); font-weight: 700; }
+.campo.cambiato label::after, .campo.cambiato .etichetta::after { content: " · modificato"; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--inchiostro-tenue); }
+.campo.cambiato input, .campo.cambiato textarea { border-bottom: 2px solid var(--uovo); }
+.campo input:not([readonly]):hover { background: var(--uovo-tenue); }
+.campo input[readonly], .campo textarea[readonly] { color: var(--inchiostro-tenue); }
+
+/* nella pila: pallino per le schede con modifiche non salvate */
+.voce.modificata .titolo::after { content: " ●"; color: var(--uovo); }
+
+/* barra del salvataggio, sempre a portata di mano in fondo allo schermo */
+.barra-salva {
+  position: sticky; bottom: 0; z-index: 3;
+  margin: 22px -32px -32px -64px; padding: 12px 32px 12px 64px;
+  display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
+  background: var(--cartellino); border-top: 1.5px solid var(--inchiostro);
+}
+.barra-salva.attiva { background: var(--uovo-tenue); }
+.barra-testo { font-weight: 700; }
+.barra-bottoni { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 860px) { .barra-salva { margin: 22px -18px -28px -50px; padding: 12px 18px 12px 50px; } }
+
+/* anteprima: prima e dopo */
+.confronto { border-collapse: collapse; width: 100%; margin: 10px 0 14px; font-size: 0.95rem; }
+.confronto th, .confronto td { text-align: left; vertical-align: top; padding: 7px 10px 7px 0; border-bottom: 1.5px dotted var(--riga); overflow-wrap: anywhere; }
+.confronto thead th { font-size: 0.75rem; letter-spacing: .07em; text-transform: uppercase; color: var(--inchiostro-tenue); font-weight: 400; border-bottom: 1.5px solid var(--inchiostro); }
+.confronto td.dopo { font-weight: 700; }
+.confronto .vuoto-cella { color: var(--inchiostro-tenue); font-style: italic; font-weight: 400; }
+.note-salvataggio { margin: 0 0 12px; padding-left: 1.2em; font-size: 0.9rem; }
+.note-salvataggio li { margin-bottom: 4px; }
+.passi { list-style: none; padding: 0; margin: 0 0 12px; }
+.passi li { padding: 3px 0; }
+.passi li::before { content: "… "; color: var(--inchiostro-tenue); }
+.passi li.fatto::before { content: "✓ "; color: var(--inchiostro); font-weight: 700; }
+.passi li.fallito::before { content: "✗ "; color: var(--timbro); font-weight: 700; }
+.passi li.errore-passo { color: var(--timbro); border: 1.5px solid var(--timbro); padding: 8px 10px; margin-top: 6px; }
+.passi li.errore-passo::before { content: ""; }
+.bottoni-dialogo { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin: 16px 0 0; }
+
+/* pulsante per le azioni che non si possono annullare */
+.bottone.pericolo { color: var(--timbro); border-color: var(--timbro); box-shadow: 2px 2px 0 var(--timbro); }
+.bottone.leggero.pericolo { box-shadow: none; }
+
+/* copie di sicurezza */
+.copie { margin-top: 22px; border: 1.5px dashed var(--inchiostro-tenue); padding: 12px 14px; }
+.copie h3 { font-size: 1.05rem; display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.copie ul { margin: 6px 0; padding-left: 1.2em; font-size: 0.9rem; }
+.promemoria { margin: 0; padding: 6px 10px; border-left: 4px solid var(--uovo); background: var(--uovo-tenue); }
+.bottoni-copie { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.bottoni-copie .bottone { padding: 6px 10px; font-size: 0.85rem; }
+
+@media (max-width: 860px) { .timbro { right: 160px; top: 130px; font-size: 1.2rem; } }
+@media (max-width: 520px) { .timbro { right: 24px; top: 250px; } }
