@@ -55,5 +55,11 @@
     riepilogo.className = fallite.length ? "ko" : "ok";
     document.getElementById("esito").textContent = JSON.stringify({ totale: elenco.length, superate, fallite });
     document.title = (fallite.length ? "✗ " : "✓ ") + "Prove Tag-liatelle";
+    // solo quando la pagina è aperta da strumenti/prova.py (indirizzo con "consegna=1"):
+    // consegna il risultato allo script, che ascolta su questo stesso computer
+    if (/[?&]consegna=1/.test(location.search)) {
+      const leggi = (id) => { const t = document.getElementById(id).textContent; return t ? JSON.parse(t) : null; };
+      await fetch("/esito", { method: "POST", body: JSON.stringify({ esito: leggi("esito"), letture: leggi("letture"), scritti: leggi("scritti") }) });
+    }
   };
 })();

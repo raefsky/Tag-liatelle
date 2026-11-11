@@ -250,5 +250,169 @@
       "inizio": 79,
       "fine": 8419
     }
+  },
+  "10-flac-senza-tag.flac": {
+    "descrizione": "FLAC con il solo blocco STREAMINFO, senza tag.",
+    "formato": "FLAC",
+    "campi": {},
+    "immagini": [],
+    "personalizzati": [],
+    "altri": [],
+    "fornitore": null,
+    "audio": {
+      "inizio": 42,
+      "fine": 108
+    }
+  },
+  "11-flac-base.flac": {
+    "descrizione": "FLAC con i campi Base, accenti e spazio libero.",
+    "formato": "FLAC",
+    "campi": {
+      "titolo": "Perché la città è più bella di sera",
+      "artista": "Niccolò & la Società Corale",
+      "album": "Canzoni d'autunno — vol. 2",
+      "anno": "2025",
+      "genere": "Folk",
+      "traccia": [
+        "2",
+        "10"
+      ],
+      "disco": [
+        "1",
+        "2"
+      ]
+    },
+    "immagini": [],
+    "personalizzati": [],
+    "altri": [],
+    "fornitore": "reference libFLAC 1.4.3 20230623",
+    "audio": {
+      "inizio": 1339,
+      "fine": 1405
+    }
+  },
+  "12-flac-copertine-e-sconosciuti.flac": {
+    "descrizione": "FLAC con due copertine, tutti i gruppi, nomi minuscoli, due artisti, campi e blocchi sconosciuti.",
+    "formato": "FLAC",
+    "campi": {
+      "titolo": "Tagliatelle al ragù",
+      "artista": "Le Sfogline; Nonna Ìrma",
+      "album": "Al dente",
+      "artistaAlbum": "Artisti vari",
+      "anno": "2026",
+      "traccia": [
+        "03",
+        "12"
+      ],
+      "genere": "Cantautorato",
+      "paroliere": "Zia Pina",
+      "copyright": "2026 Le Sfogline",
+      "copyrightRegistrazione": "2026 Etichetta Fantasia",
+      "editore": "Edizioni del Mattarello",
+      "isrc": "ITA012600003",
+      "bpm": "96",
+      "tonalita": "Am",
+      "compilation": "1",
+      "codificatoDa": "Tag-liatelle prove",
+      "catalogo": "MAT-003",
+      "codiceBarre": "8012345678905",
+      "commenti": "Da servire caldo.",
+      "testo": "Prima riga del testo\nSeconda riga",
+      "sitoArtista": "https://esempio.it/sfogline",
+      "licenza": "CC BY-NC-SA 4.0",
+      "sitoLicenza": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    },
+    "immagini": [
+      {
+        "tipo": 3,
+        "mime": "image/png",
+        "byte": 93
+      },
+      {
+        "tipo": 4,
+        "mime": "image/jpeg",
+        "byte": 855
+      }
+    ],
+    "personalizzati": [
+      {
+        "nome": "FORNO",
+        "valore": "statico, 180 °C"
+      },
+      {
+        "nome": "REPLAYGAIN_TRACK_GAIN",
+        "valore": "-6.50 dB"
+      }
+    ],
+    "altri": [
+      "APPLICATION",
+      "METADATA_BLOCK_PICTURE"
+    ],
+    "fornitore": "reference libFLAC 1.4.3 20230623",
+    "audio": {
+      "inizio": 3753,
+      "fine": 3819
+    }
+  },
+  "13-flac-con-id3-davanti.flac": {
+    "descrizione": "FLAC con un tag ID3v2 messo davanti da un altro programma.",
+    "formato": "FLAC",
+    "campi": {
+      "titolo": "Il titolo vero",
+      "artista": "Duo Farina"
+    },
+    "immagini": [],
+    "personalizzati": [],
+    "altri": [
+      "ID3v2"
+    ],
+    "fornitore": "Lavf60.3.100",
+    "audio": {
+      "inizio": 262,
+      "fine": 328
+    }
+  },
+  "14-flac-senza-padding.flac": {
+    "descrizione": "FLAC senza spazio libero, con TOTALTRACKS e una copertina.",
+    "formato": "FLAC",
+    "campi": {
+      "titolo": "Stretti stretti",
+      "artista": "I Compatti",
+      "anno": "1999",
+      "traccia": [
+        "5",
+        "8"
+      ]
+    },
+    "immagini": [
+      {
+        "tipo": 3,
+        "mime": "image/jpeg",
+        "byte": 855
+      }
+    ],
+    "personalizzati": [],
+    "altri": [],
+    "fornitore": "reference libFLAC 1.4.3 20230623",
+    "audio": {
+      "inizio": 1080,
+      "fine": 1146
+    }
+  },
+  "15-flac-rovinato.flac": {
+    "descrizione": "FLAC con i commenti in parte rovinati.",
+    "formato": "FLAC",
+    "campi": {
+      "titolo": "Si legge solo il titolo"
+    },
+    "immagini": [],
+    "personalizzati": [],
+    "altri": [],
+    "fornitore": "reference libFLAC 1.4.3 20230623",
+    "avvisi": true,
+    "audio": {
+      "inizio": 269,
+      "fine": 335
+    }
   }
 }

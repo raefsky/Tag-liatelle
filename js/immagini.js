@@ -29,7 +29,9 @@
     if (!b || b.length < 12) return null;
     // PNG: firma e blocco IHDR
     if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47 && b.length >= 24) {
-      return { formato: "PNG", larghezza: u32(b, 16), altezza: u32(b, 20) };
+      // profondità di colore: bit per canale × numero di canali (dal tipo di colore del PNG)
+      const canali = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[b[25]] || 3;
+      return { formato: "PNG", larghezza: u32(b, 16), altezza: u32(b, 20), profondita: b[24] * canali };
     }
     // GIF
     if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
@@ -60,6 +62,7 @@
           return {
             formato: "JPEG", altezza: (b[i + 5] << 8) | b[i + 6], larghezza: (b[i + 7] << 8) | b[i + 8],
             progressivo: m === 0xC2 || m === 0xC6 || m === 0xCA || m === 0xCE, componenti: b[i + 9],
+            profondita: b[i + 4] * b[i + 9],
           };
         }
         if (m === 0xDA) break; // inizio dei dati senza SOF: file strano
