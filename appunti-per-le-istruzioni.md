@@ -50,3 +50,19 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
 - Avvisi: se la parte ritagliata è più piccola della misura scelta (verrà sfocata), se la copertina è sotto i 500 pixel, se pesa più di 1 MB.
 - La copertina cambia solo quando si salva, con la stessa anteprima e la stessa copia di sicurezza dei campi. Le altre immagini del file (retro, libretto…) restano.
 - La stessa copertina su più tracce insieme arriverà con la modifica a gruppi (blocco 7).
+
+## File FLAC (dalla versione 0.5.0)
+- I FLAC si aprono, si modificano e si salvano come gli MP3: stessa anteprima, stessa copia di sicurezza, stessa verifica dell'audio, stesso ripristino. Anche la copertina funziona allo stesso modo.
+- I tag dei FLAC si chiamano "commenti Vorbis". Tag-liatelle conserva identici tutti i commenti che non modifichi, anche quelli che non conosce: compaiono fra i "campi personalizzati".
+- **Spazio libero**: molti FLAC contengono un po' di spazio vuoto per i tag. Se le modifiche ci stanno, l'audio non viene spostato ("sul posto"). Se non ci stanno, il file viene riscritto per intero, con l'audio identico, e Tag-liatelle lascia 8 KB di spazio libero per le volte successive. L'anteprima dice quale dei due casi si verifica.
+- Più artisti (o compositori, generi…) si scrivono separati da punto e virgola e spazio, "Uno; Due": nel FLAC diventano due valori distinti, come vuole il formato.
+- Se un FLAC ha davanti un tag ID3 (messo per errore da un altro programma), Tag-liatelle lo lascia dov'è e legge i commenti Vorbis.
+- I FLAC con i dati rovinati non si possono salvare, e la scheda spiega perché.
+- Nomi scelti dove il formato non ne ha uno ufficiale:
+  - copyright della registrazione (℗): `PRODUCTION_COPYRIGHT`, il nome usato dal formato Matroska;
+  - sito dell'artista: `WEBSITE`, come il programma MusicBrainz Picard (si legge anche `URL`);
+  - sito dell'etichetta: `WWWPUBLISHER`, come il programma Mp3tag;
+  - licenza: `LICENSE` contiene sia il nome della licenza sia il suo indirizzo web, come due valori.
+
+## Da ricordare per i prossimi blocchi
+- Blocco 6: nel campo "Pagina della licenza" accettare solo indirizzi che iniziano con http:// o https://, e nel campo "Licenza" non accettare indirizzi. Nei FLAC i due valori stanno entrambi in `LICENSE` e si distinguono proprio da questo.

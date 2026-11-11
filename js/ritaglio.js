@@ -127,6 +127,7 @@
    * @param {Blob} immagine   il file scelto o trascinato, oppure la copertina attuale
    */
   async function apri(immagine) {
+    if (risolvi) chiudi(null); // una finestra di ritaglio rimasta aperta si chiude come "annullata"
     let bitmap;
     try {
       bitmap = await createImageBitmap(immagine);
