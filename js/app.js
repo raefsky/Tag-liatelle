@@ -264,6 +264,7 @@
 
   // ---------- La scheda grande ----------
   let indirizziImmagini = [];
+  const gruppiAperti = new Set(); // i gruppi che l'utente ha aperto restano aperti cambiando scheda
   function liberaImmagini() { indirizziImmagini.forEach((u) => URL.revokeObjectURL(u)); indirizziImmagini = []; }
 
   function disegnaScheda() {
@@ -314,17 +315,22 @@
 
     for (const g of Campi.GRUPPI) {
       const pieni = g.campi.filter((campo) => vuoto(campi[campo.id]) === false).length;
-      const siModifica = modificabile && g.id === "base";
-      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, campi[campo.id], siModifica ? t : null)));
-      if (g.id === "extra" && l && l.personalizzati.length) griglia.append(personalizzati(l.personalizzati));
+      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampo(campo, campi[campo.id], modificabile ? t : null)));
+      if (g.id === "extra" && l) {
+        if (modificabile) griglia.append(editorPersonalizzati(t));
+        else if (l.personalizzati.length) griglia.append(personalizzati(l.personalizzati));
+      }
       if (g.sempreAperto) {
         c.append(el("div", { classe: "gruppo" }, el("h3", { testo: g.nome }), griglia));
       } else {
         const conta = pieni + (g.id === "extra" && l ? l.personalizzati.length : 0);
-        c.append(el("details", { classe: "gruppo" },
+        // il gruppo resta aperto se lo era, o se contiene modifiche non salvate
+        const conModifiche = g.campi.some((campo) => campo.id in t.modifiche) || (g.id === "extra" && "personalizzati" in t.modifiche);
+        const d = el("details", { classe: "gruppo", "data-gruppo": g.id, open: gruppiAperti.has(g.id) || conModifiche },
           el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota + (conta ? ` · ${conta} compilat${conta === 1 ? "o" : "i"}` : "") })),
-          el("p", { classe: "nota-piccola", testo: "Per ora questi campi si possono solo leggere: la modifica arriva in una prossima versione." }),
-          griglia));
+          griglia);
+        d.addEventListener("toggle", () => { if (d.open) gruppiAperti.add(g.id); else gruppiAperti.delete(g.id); });
+        c.append(d);
       }
     }
 
@@ -439,15 +445,12 @@
         : `Nel file ci sono anche ${altri.length} dati che Tag-liatelle non mostra (${nomi}). Verranno conservati così come sono.`);
   }
 
-  function personalizzati(lista) {
-    return el("div", { classe: "campo largo personalizzati" },
-      el("span", { classe: "etichetta", testo: "Campi personalizzati" }),
-      el("dl", {}, ...lista.flatMap((p) => [el("dt", { testo: p.nome }), el("dd", { testo: p.valore })])));
-  }
+
 
   /**
    * Un campo della scheda. Se "traccia" è data, il campo si può modificare:
    * il valore mostrato è quello modificato, e ogni cambiamento finisce in traccia.modifiche.
+   * Sotto il campo compare un messaggio se il valore non va bene (errore) o è sospetto (avviso).
    */
   function disegnaCampo(campo, originale, traccia) {
     const id = "campo-" + campo.id;
@@ -455,32 +458,158 @@
     const modificato = traccia && campo.id in traccia.modifiche;
     const valore = modificato ? traccia.modifiche[campo.id] : originale;
     const sola = !traccia;
-    const segna = (nodo) => { nodo.classList.toggle("cambiato", !!(traccia && campo.id in traccia.modifiche)); };
+    const formato = traccia ? traccia.formato : "MP3";
+    const messaggio = el("p", { classe: "messaggio-campo", id: id + "-msg", "aria-live": "polite" });
+    const controlla = (v) => {
+      const esito = traccia ? Campi.controllaValore(campo.id, v, formato) : {};
+      const cambiato = traccia && campo.id in traccia.modifiche;
+      // un valore già nel file e mai toccato non blocca il salvataggio: al massimo si avvisa
+      const errore = esito.errore && cambiato;
+      messaggio.textContent = esito.errore || esito.avviso || "";
+      messaggio.className = "messaggio-campo" + (errore ? " errore" : esito.errore || esito.avviso ? " dubbio" : "");
+    };
+    const segna = (nodo, v) => { nodo.classList.toggle("cambiato", !!(traccia && campo.id in traccia.modifiche)); controlla(v); };
 
     if (campo.tipo === "numero-di") {
       const [n, tot] = valore || ["", ""];
       const box = el("div", { classe: classi, role: "group", "aria-labelledby": id + "-et" });
-      const a = el("input", { id, value: n, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", numero" });
-      const b = el("input", { value: tot, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", totale" });
-      if (traccia) for (const x of [a, b]) x.addEventListener("input", () => { cambia(traccia, campo.id, [a.value, b.value], originale); segna(box); });
+      const a = el("input", { id, value: n, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", numero", "aria-describedby": id + "-msg" });
+      const b = el("input", { value: tot, readonly: sola, inputmode: "numeric", "aria-label": campo.etichetta + ", totale", "aria-describedby": id + "-msg" });
+      if (traccia) for (const x of [a, b]) x.addEventListener("input", () => { cambia(traccia, campo.id, [a.value, b.value], originale); segna(box, [a.value, b.value]); });
       box.append(el("span", { classe: "etichetta", id: id + "-et", testo: campo.etichetta }),
-        el("span", { classe: "coppia" }, a, el("span", { testo: "di" }), b));
-      segna(box);
+        el("span", { classe: "coppia" }, a, el("span", { testo: "di" }), b), messaggio);
+      segna(box, [n, tot]);
       return box;
     }
+
     let campoInput;
     if (campo.tipo === "lungo") {
-      campoInput = el("textarea", { id, readonly: sola, rows: 3 });
+      campoInput = el("textarea", { id, readonly: sola, rows: campo.id === "testo" ? 5 : 3 });
       campoInput.value = valore || "";
     } else if (campo.tipo === "si-no") {
-      campoInput = el("input", { id, value: vuoto(valore) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(valore).trim()) ? "sì" : "no", readonly: true });
+      const attuale = vuoto(valore) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(valore).trim()) ? "1" : "0";
+      if (sola) {
+        campoInput = el("input", { id, value: attuale === "1" ? "sì" : attuale === "0" ? "no" : "", readonly: true });
+      } else {
+        campoInput = el("select", { id },
+          el("option", { value: "", testo: "—" }), el("option", { value: "1", testo: "sì" }), el("option", { value: "0", testo: "no" }));
+        campoInput.value = attuale;
+        // confronto con il valore del file scritto allo stesso modo ("1" / "0")
+        const originaleNormale = vuoto(originale) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(originale).trim()) ? "1" : "0";
+        campoInput.addEventListener("change", () => { cambia(traccia, campo.id, campoInput.value, originaleNormale); segna(box, campoInput.value); });
+      }
     } else {
-      campoInput = el("input", { id, value: valore || "", readonly: sola, autocomplete: "off", spellcheck: campo.id === "titolo" || campo.id === "album" ? "true" : "false" });
+      const attributi = { id, value: valore || "", readonly: sola, autocomplete: "off", spellcheck: ["titolo", "album", "sottotitolo"].includes(campo.id) ? "true" : "false", "aria-describedby": id + "-msg" };
+      if (campo.id === "lingua") attributi.list = "elenco-lingue";
+      if (["sitoArtista", "sitoLicenza", "sitoEtichetta"].includes(campo.id)) attributi.inputmode = "url";
+      if (campo.id === "bpm") attributi.inputmode = "decimal";
+      campoInput = el("input", attributi);
     }
-    const box = el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), campoInput);
-    if (traccia && campo.tipo !== "si-no") campoInput.addEventListener("input", () => { cambia(traccia, campo.id, campoInput.value, originale); segna(box); });
-    segna(box);
+    const box = el("div", { classe: classi }, el("label", { for: id, testo: campo.etichetta }), campoInput, messaggio);
+    if (traccia && campo.tipo !== "si-no") campoInput.addEventListener("input", () => { cambia(traccia, campo.id, campoInput.value, originale); segna(box, campoInput.value); });
+
+    // indirizzi web: un collegamento per aprirli e controllarli
+    if (["sitoArtista", "sitoLicenza", "sitoEtichetta"].includes(campo.id)) {
+      const vai = el("a", { classe: "apri-indirizzo", target: "_blank", rel: "noopener noreferrer", testo: "apri la pagina ↗" });
+      const aggiorna = () => {
+        const v = campoInput.value.trim();
+        const ok = /^https?:\/\/\S+$/i.test(v);
+        vai.hidden = !ok;
+        if (ok) vai.href = v;
+      };
+      campoInput.addEventListener("input", aggiorna);
+      aggiorna();
+      box.append(vai);
+    }
+    // licenza: scelta rapida fra le Creative Commons
+    if (campo.id === "licenza" && traccia) box.append(sceltaLicenza(traccia));
+    segna(box, campoInput.value);
     return box;
+  }
+
+  /** Il menu delle licenze Creative Commons: compila insieme il nome e la pagina della licenza. */
+  function sceltaLicenza(traccia) {
+    const menu = el("select", { classe: "licenza-rapida", "aria-label": "Scelta rapida della licenza" },
+      el("option", { value: "", testo: "Scelta rapida: Creative Commons…" }),
+      Campi.LICENZE.map((l) => el("option", { value: l.nome, testo: `${l.nome} — ${l.spiega}` })));
+    menu.addEventListener("change", () => {
+      const l = Campi.LICENZE.find((x) => x.nome === menu.value);
+      if (!l) return;
+      for (const [id, valore] of [["licenza", l.nome], ["sitoLicenza", l.url]]) {
+        const c = $("#campo-" + id);
+        if (c) { c.value = valore; c.dispatchEvent(new Event("input")); }
+      }
+      menu.value = "";
+      avvisa(`Licenza scelta: ${l.nome}. Ho compilato anche la pagina della licenza.`);
+    });
+    return menu;
+  }
+
+  // ---------- Campi personalizzati ----------
+  const copiaPersonalizzati = (lista) => lista.map((p) => Object.defineProperty({ nome: p.nome, valore: p.valore }, "sorgente", { value: p.sorgente, enumerable: false }));
+
+  function personalizzati(lista) {
+    return el("div", { classe: "campo largo personalizzati" },
+      el("span", { classe: "etichetta", testo: "Campi personalizzati" }),
+      el("dl", {}, ...lista.flatMap((p) => [el("dt", { testo: p.nome }), el("dd", { testo: p.valore })])));
+  }
+
+  /** L'elenco modificabile dei campi personalizzati: nome, valore e pulsante per toglierlo. */
+  function editorPersonalizzati(t) {
+    const originali = t.lettura.personalizzati;
+    let lista = copiaPersonalizzati(t.modifiche.personalizzati || originali);
+    const box = el("div", { classe: "campo largo personalizzati modificabili", role: "group", "aria-labelledby": "etichetta-personalizzati" });
+    const righe = el("div", { classe: "righe-personalizzati" });
+    const messaggio = el("p", { classe: "messaggio-campo", "aria-live": "polite" });
+
+    const registra = () => {
+      // le righe lasciate del tutto vuote non contano
+      const piene = lista.filter((p) => String(p.nome).trim() || String(p.valore).trim());
+      const uguali = piene.length === originali.length && piene.every((p, i) => p.nome === originali[i].nome && p.valore === originali[i].valore);
+      if (uguali) delete t.modifiche.personalizzati;
+      else t.modifiche.personalizzati = copiaPersonalizzati(lista);
+      box.classList.toggle("cambiato", !uguali);
+      const esito = Campi.controllaPersonalizzati(lista, t.formato);
+      messaggio.textContent = esito.errore || "";
+      messaggio.className = "messaggio-campo" + (esito.errore ? " errore" : "");
+      aggiornaBarra(t);
+      aggiornaVoce(t);
+    };
+    const disegna = () => {
+      righe.replaceChildren(...lista.map((p, i) => {
+        const nome = el("input", { value: p.nome, "aria-label": `Nome del campo personalizzato ${i + 1}`, placeholder: "nome", autocomplete: "off", spellcheck: "false" });
+        const valore = el("input", { value: p.valore, "aria-label": `Valore del campo personalizzato ${i + 1}`, placeholder: "valore", autocomplete: "off" });
+        nome.addEventListener("input", () => { lista[i] = Object.defineProperty({ nome: nome.value, valore: lista[i].valore }, "sorgente", { value: lista[i].sorgente, enumerable: false }); registra(); });
+        valore.addEventListener("input", () => { lista[i] = Object.defineProperty({ nome: lista[i].nome, valore: valore.value }, "sorgente", { value: lista[i].sorgente, enumerable: false }); registra(); });
+        const togli = el("button", { classe: "bottone leggero bottone-icona", type: "button", title: "Togli questo campo", "aria-label": `Togli il campo ${p.nome || i + 1}`,
+          suclick: () => { lista.splice(i, 1); disegna(); registra(); } }, icona("chiudi"));
+        return el("div", { classe: "riga-personalizzato" }, nome, el("span", { testo: "=" }), valore, togli);
+      }));
+    };
+    const aggiungiRiga = el("button", { classe: "bottone leggero", type: "button", suclick: () => {
+      lista.push({ nome: "", valore: "" });
+      disegna(); registra();
+      const ultimi = righe.querySelectorAll(".riga-personalizzato input");
+      if (ultimi.length) ultimi[ultimi.length - 2].focus();
+    } }, "+ Aggiungi un campo");
+    disegna();
+    box.append(
+      el("span", { classe: "etichetta", id: "etichetta-personalizzati", testo: "Campi personalizzati" }),
+      el("p", { classe: "nota-piccola", testo: t.formato === "FLAC"
+        ? "Campi liberi, con il nome che vuoi. Nei FLAC il nome si scrive di solito in maiuscolo e senza accenti, per esempio FORNO."
+        : "Campi liberi, con il nome che vuoi (negli MP3 diventano campi TXXX)." }),
+      righe, messaggio, el("p", {}, aggiungiRiga));
+    if (t.modifiche.personalizzati) box.classList.add("cambiato");
+    return box;
+  }
+
+  /** Apre il gruppo che contiene un campo e ci porta il cursore. */
+  function mostraCampo(campo) {
+    const g = Campi.GRUPPI.find((x) => x.campi.some((c) => c.id === campo)) || (campo === "personalizzati" ? Campi.GRUPPI.find((x) => x.id === "extra") : null);
+    const d = g && document.querySelector(`details[data-gruppo="${g.id}"]`);
+    if (d) d.open = true;
+    const nodo = campo === "personalizzati" ? document.querySelector(".righe-personalizzati input") : $("#campo-" + campo);
+    if (nodo) { nodo.scrollIntoView({ block: "center" }); nodo.focus(); }
   }
 
   // ---------- Modifiche non ancora salvate ----------
@@ -531,17 +660,50 @@
     const l = t.lettura;
     const controllo = Formati.per(t.formato).controlla(l);
     if (!controllo.ok) { avvisa(controllo.motivo, 9000); return; }
+    // controlli dei valori: con un errore non si va avanti
+    const errori = [], attenzione = [];
+    for (const [k, v] of Object.entries(t.modifiche)) {
+      if (k === "copertina") continue;
+      if (k === "personalizzati") {
+        const esito = Campi.controllaPersonalizzati(v, t.formato);
+        if (esito.errore) errori.push({ campo: k, testo: "Campi personalizzati: " + esito.errore });
+        continue;
+      }
+      const etichetta = (Campi.TUTTI.find((c) => c.id === k) || {}).etichetta || k;
+      const esito = Campi.controllaValore(k, v, t.formato);
+      if (esito.errore) errori.push({ campo: k, testo: `${etichetta}: ${esito.errore}` });
+      else if (esito.avviso) attenzione.push(`Attenzione, ${etichetta.toLowerCase()}: ${esito.avviso}`);
+    }
+    if (errori.length) {
+      avvisa((errori.length > 1 ? `Ci sono ${errori.length} valori da correggere. Il primo è… ` : "") + errori[0].testo, 10000);
+      mostraCampo(errori[0].campo);
+      return;
+    }
+    // i valori come verranno scritti (per esempio l'ISRC senza trattini)
+    for (const k of Object.keys(t.modifiche)) {
+      if (k !== "copertina" && k !== "personalizzati") t.modifiche[k] = Campi.normalizza(k, t.modifiche[k]);
+    }
     const corpo = $("#anteprima-corpo");
     corpo.replaceChildren();
-    const righe = Object.keys(t.modifiche).filter((k) => k !== "copertina").map((k) => {
+    const righe = Object.keys(t.modifiche).filter((k) => k !== "copertina" && k !== "personalizzati").map((k) => {
       const campo = Campi.TUTTI.find((c) => c.id === k);
-      const prima = mostraValore(l.campi[k]);
-      const dopo = mostraValore(normale(t.modifiche[k]));
+      // la compilation si scrive 1 o 0, ma si legge meglio sì o no
+      const leggibile = (v) => (k === "compilation" && !vuoto(v) ? (/^(1|s[iì]|yes|true)$/i.test(String(v).trim()) ? "sì" : "no") : mostraValore(v));
+      const prima = leggibile(l.campi[k]);
+      const dopo = leggibile(normale(t.modifiche[k]));
       return el("tr", {},
         el("th", { scope: "row", testo: campo ? campo.etichetta : k }),
         el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(vuoto)" }),
         el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolto)" }));
     });
+    if (t.modifiche.personalizzati) {
+      const elenco = (lista) => lista.filter((p) => String(p.nome).trim() || String(p.valore).trim()).map((p) => `${String(p.nome).trim()} = ${String(p.valore).trim()}`).join("\n");
+      const prima = elenco(l.personalizzati), dopo = elenco(t.modifiche.personalizzati);
+      righe.push(el("tr", {},
+        el("th", { scope: "row", testo: "Campi personalizzati" }),
+        el("td", { classe: "a-capo" + (prima ? "" : " vuoto-cella"), testo: prima || "(nessuno)" }),
+        el("td", { classe: "a-capo " + (dopo ? "dopo" : "dopo vuoto-cella"), testo: dopo || "(nessuno)" })));
+    }
     const cop = t.modifiche.copertina;
     if (cop) {
       const fronte = l.immagini.find((i) => i.tipo === 3) || (cop.azione === "rimuovi" ? l.immagini[0] : null);
@@ -561,6 +723,7 @@
     const campiV1 = ["titolo", "artista", "album", "anno", "traccia", "genere"];
     const note = preparato.note.filter((n) => !n.includes("ID3v1, alla fine") || campiV1.some((k) => k in t.modifiche));
     if (cop) note.push("Le altre immagini del file (retro, libretto…) restano come sono.");
+    note.push(...attenzione);
     if (t.maniglia) {
       note.unshift(`Prima di scrivere faccio una copia di sicurezza del file nella cartella «${Salvataggio.COPIE}», accanto al file.`);
       if (!t.radice && !t.accesso) note.unshift("Se il browser non conosce ancora la cartella di questo file, ti chiederò di sceglierla: serve per mettere lì la copia di sicurezza.");

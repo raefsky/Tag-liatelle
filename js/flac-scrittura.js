@@ -35,6 +35,7 @@
   for (const c of Campi.TUTTI) if (c.vorbis) CAMPO[c.id] = c.vorbis[0];
 
   const utf8 = (testo) => new TextEncoder().encode(testo);
+  const NASCOSTI = new Set(["METADATA_BLOCK_PICTURE", "COVERART", "COVERARTMIME"]);
   function unisci(pezzi) {
     const out = new Uint8Array(pezzi.reduce((s, p) => s + p.length, 0));
     let i = 0;
@@ -84,10 +85,26 @@
     // ogni voce: { campo, grezzo }; quelle non toccate tengono i loro byte originali
     let voci = ((commenti && commenti.voci) || []).map((v) => ({ campo: v.nome ? Flac.campoDi(v.nome, v.valore) : null, nome: v.nome, grezzo: v.grezzo }));
     for (const [campo, valore] of Object.entries(modifiche)) {
+      if (campo === "personalizzati") continue;
       const vecchie = voci.filter((v) => v.campo === campo);
       const nuove = nuoveVoci(campo, valore, vecchie).map(([nome, val]) => ({ campo, nome, grezzo: utf8(`${nome}=${val}`) }));
       const posto = voci.findIndex((v) => v.campo === campo);
       voci = voci.filter((v) => v.campo !== campo);
+      voci.splice(posto < 0 ? voci.length : posto, 0, ...nuove);
+    }
+    if (modifiche.personalizzati) {
+      // i commenti personalizzati: quelli rimasti uguali tengono i loro byte, gli altri si riscrivono
+      const eLibero = (v) => v.campo === null && v.nome && !NASCOSTI.has(v.nome.toUpperCase());
+      const posto = voci.findIndex(eLibero);
+      const nuove = [];
+      for (const p of modifiche.personalizzati) {
+        const nome = String(p.nome || "").trim(), valore = String(p.valore || "").trim();
+        if (!nome && !valore) continue;
+        const s = p.sorgente;
+        const uguale = s && s.nome === nome && s.valore.trim() === valore;
+        nuove.push({ campo: null, nome, grezzo: uguale ? s.grezzo : utf8(`${nome}=${valore}`) });
+      }
+      voci = voci.filter((v) => !eLibero(v));
       voci.splice(posto < 0 ? voci.length : posto, 0, ...nuove);
     }
     const fornitore = commenti ? commenti.fornitoreGrezzo : utf8(FORNITORE);

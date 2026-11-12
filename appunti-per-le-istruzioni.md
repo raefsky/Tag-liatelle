@@ -64,5 +64,16 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
   - sito dell'etichetta: `WWWPUBLISHER`, come il programma Mp3tag;
   - licenza: `LICENSE` contiene sia il nome della licenza sia il suo indirizzo web, come due valori.
 
-## Da ricordare per i prossimi blocchi
-- Blocco 6: nel campo "Pagina della licenza" accettare solo indirizzi che iniziano con http:// o https://, e nel campo "Licenza" non accettare indirizzi. Nei FLAC i due valori stanno entrambi in `LICENSE` e si distinguono proprio da questo.
+## Tutti i gruppi di campi (dalla versione 0.6.0)
+- Si possono modificare tutti e quattro i gruppi: Base, Crediti, Edizione e diritti, Extra. I gruppi chiusi si aprono da soli se contengono modifiche non salvate.
+- Sotto un campo può comparire un messaggio:
+  - **✗ in rosso**: il valore non va bene e il file non si salva finché non lo correggi. Premendo "Salva…" il cursore va direttamente sul campo;
+  - **⚠ in grigio**: il valore è sospetto ma si può salvare, per esempio un codice a barre con l'ultima cifra sbagliata. L'avviso compare anche nell'anteprima.
+- **Codice ISRC**: 12 caratteri, cioè 2 lettere del paese, 3 lettere o cifre, 2 cifre dell'anno e 5 cifre. Si può scrivere con o senza trattini (IT-A1B-26-00001); nel file viene scritto senza trattini e in maiuscolo, come vuole lo standard. Tag-liatelle controlla solo la forma: il codice va chiesto all'ente che lo assegna.
+- **Indirizzi web** (sito dell'artista, pagina della licenza, sito dell'etichetta): devono iniziare con https:// o http://. Accanto c'è "apri la pagina" per controllarli.
+- **Licenza**: sotto il campo c'è la scelta rapida fra le licenze Creative Commons, che compila insieme il nome e la pagina della licenza. Nel campo "Licenza" va il nome, non l'indirizzo: nei FLAC i due valori stanno entrambi in `LICENSE` e si distinguono proprio così.
+- **Lingua**: negli MP3 si scrive con il codice di 3 lettere (ita, eng, fra…), e il campo ne suggerisce alcuni. Nei FLAC è testo libero.
+- **Compilation**: si sceglie fra "sì", "no" e "—" (campo vuoto).
+- **Più valori**: compositori, parolieri, artisti, generi… si separano con punto e virgola e spazio, "Uno; Due".
+- **Copyright della registrazione (℗)**: negli MP3 ID3v2.4 va nel campo ufficiale TPRO. Negli MP3 ID3v2.3, che non ha un campo apposito, va in un campo personalizzato `PRODUCTION_COPYRIGHT`, con lo stesso nome usato nei FLAC.
+- **Campi personalizzati**, in fondo al gruppo Extra: si aggiungono con "+ Aggiungi un campo" e si tolgono con la ×. Il nome non può essere quello di un campo che esiste già (per esempio TITLE), e nei FLAC si scrive senza accenti e senza "=". I campi che non tocchi restano identici nel file.

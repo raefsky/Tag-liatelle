@@ -32,7 +32,8 @@ CAMPI_MUTAGEN = {
     "tonalita": "TKEY", "compilation": "TCMP", "codificatoDa": "TENC",
     "sitoArtista": "WOAR", "sitoLicenza": "WCOP", "sitoEtichetta": "WPUB",
 }
-TXXX_MUTAGEN = {"catalogo": "CATALOGNUMBER", "codiceBarre": "BARCODE", "licenza": "LICENSE"}
+TXXX_MUTAGEN = {"catalogo": "CATALOGNUMBER", "codiceBarre": "BARCODE", "licenza": "LICENSE",
+                "copyrightRegistrazione": "PRODUCTION_COPYRIGHT"}
 
 
 def browser():
@@ -108,9 +109,11 @@ TOTALI = {"TRACKTOTAL": "traccia", "TOTALTRACKS": "traccia", "DISCTOTAL": "disco
 def lettura_mutagen_flac(percorso):
     from mutagen.flac import FLAC
     f = FLAC(percorso)
-    valori, numeri = {}, {}
+    valori, numeri, personalizzati = {}, {}, []
     for nome, valore in (f.tags or []):          # in mutagen i commenti sono coppie (nome, valore), in ordine
         n = nome.upper()
+        if n not in VORBIS and n not in TOTALI and n not in ("LICENSE", "METADATA_BLOCK_PICTURE", "COVERART", "COVERARTMIME"):
+            personalizzati.append({"nome": nome, "valore": valore})
         if n == "LICENSE":
             campo = "sitoLicenza" if valore.strip().lower().startswith(("http://", "https://")) else "licenza"
         else:
@@ -138,7 +141,7 @@ def lettura_mutagen_flac(percorso):
     for campo, x in numeri.items():
         campi[campo] = [x.get("n", ""), x["tot"] if "tot" in x else x.get("insieme", "")]
     immagini = [{"tipo": int(p.type), "mime": p.mime, "byte": len(p.data)} for p in f.pictures]
-    return {"campi": campi, "immagini": immagini, "durata": f.info.length}
+    return {"campi": campi, "immagini": immagini, "durata": f.info.length, "personalizzati": personalizzati}
 
 
 def audio_flac(dati):
@@ -200,7 +203,9 @@ def lettura_mutagen(percorso):
     if uslt:
         campi["testo"] = uslt[0].text
     immagini = [{"tipo": int(f.type), "mime": f.mime, "byte": len(f.data)} for f in tags.getall("APIC")]
-    return {"campi": campi, "immagini": immagini}
+    noti = set(TXXX_MUTAGEN.values())
+    personalizzati = [{"nome": f.desc, "valore": "; ".join(f.text)} for f in tags.getall("TXXX") if f.desc.upper() not in noti]
+    return {"campi": campi, "immagini": immagini, "personalizzati": personalizzati}
 
 
 def main():
@@ -257,6 +262,9 @@ def main():
                 for k in sorted(set(s["campi"]) | set(loro["campi"])):
                     if s["campi"].get(k) != loro["campi"].get(k):
                         problemi.append(f"{k}: atteso {s['campi'].get(k)!r}, mutagen {loro['campi'].get(k)!r}")
+            ordina = lambda l: sorted(l, key=lambda p: (p["nome"], p["valore"]))
+            if "personalizzati" in s and ordina(loro["personalizzati"]) != ordina(s["personalizzati"]):
+                problemi.append(f"campi personalizzati: attesi {s['personalizzati']}, mutagen {loro['personalizzati']}")
             if "immagini" in s and loro["immagini"] != s["immagini"]:
                 problemi.append(f"immagini: attese {s['immagini']}, mutagen {loro['immagini']}")
             if flac:

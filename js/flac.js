@@ -108,7 +108,7 @@
       const N = v.nome.toUpperCase();
       if (NASCOSTI.has(N)) { nascosti.push(N); continue; }
       const campo = campoDi(v.nome, v.valore);
-      if (!campo) { personalizzati.push({ nome: v.nome, valore: v.valore }); continue; }
+      if (!campo) { personalizzati.push(Object.defineProperty({ nome: v.nome, valore: v.valore }, "sorgente", { value: v, enumerable: false })); continue; }
       if (campo === "traccia" || campo === "disco") {
         const x = numeri[campo] || (numeri[campo] = {});
         if (eTotale(v.nome)) { if (x.tot === undefined) x.tot = v.valore.trim(); }
