@@ -22,6 +22,7 @@
   --uovo:             #E5A823;  /* l'unico accento */
   --uovo-tenue:       #F4DFA6;  /* accento chiaro, solo per sfondi */
   --timbro:           #B3362B;  /* rosso timbro: conferme e avvisi */
+  --fuoco:            #9C6B00;  /* contorno del focus: giallo più scuro, si vede sulla carta (contrasto ≥ 3:1) */
   --fondo-foro:       var(--carta);
   --grana: 0.05;                 /* intensità della texture di carta */
 
@@ -39,11 +40,12 @@
     --cartellino:       #33291F;
     --cartellino-ombra: #2B231B;
     --inchiostro:       #EFE4CF;
-    --inchiostro-tenue: #BFAE95;
+    --inchiostro-tenue: #CBBBA4;
     --riga:             #5E4F3F;
     --uovo:             #EDBA45;
     --uovo-tenue:       #5A4520;
-    --timbro:           #E36A55;
+    --timbro:           #E87A66;
+    --fuoco:            #EDBA45;
     --grana: 0.07;
     color-scheme: dark;
   }
@@ -53,11 +55,12 @@
   --cartellino:       #33291F;
   --cartellino-ombra: #2B231B;
   --inchiostro:       #EFE4CF;
-  --inchiostro-tenue: #BFAE95;
+  --inchiostro-tenue: #CBBBA4;
   --riga:             #5E4F3F;
   --uovo:             #EDBA45;
   --uovo-tenue:       #5A4520;
-  --timbro:           #E36A55;
+  --timbro:           #E87A66;
+    --fuoco:            #EDBA45;
   --grana: 0.07;
   color-scheme: dark;
 }
@@ -88,7 +91,7 @@ a:hover { text-decoration-color: currentColor; }
 .solo-lettori { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* focus sempre ben visibile, anche da tastiera */
-:focus-visible { outline: 3px solid var(--uovo); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--fuoco); outline-offset: 2px; }
 .salta { position: absolute; left: 8px; top: -60px; background: var(--inchiostro); color: var(--cartellino); padding: 8px 12px; z-index: 10; }
 .salta:focus { top: 8px; }
 

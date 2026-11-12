@@ -268,7 +268,7 @@
       lista.append(el("li", { classe: scelte.has(t) ? "scelta" : "" }, tracce.length >= 2 ? spunta : null,
         el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : "") + (quanteModifiche(t) ? " modificata" : ""), type: "button", "aria-current": !inGruppo() && i === corrente ? "true" : false, suclick: clic },
           el("span", { classe: "numero", testo: (c.traccia && c.traccia[0]) || "–" }),
-          el("span", { classe: "titolo", testo: titolo }),
+          el("span", { classe: "titolo", testo: titolo }, quanteModifiche(t) ? el("span", { classe: "solo-lettori", testo: " (modifiche non salvate)" }) : null),
           el("span", { classe: "formato", testo: t.formato }),
           el("span", { classe: "artista", testo: sotto })
         )
