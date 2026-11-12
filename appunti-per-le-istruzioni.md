@@ -77,3 +77,23 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
 - **Più valori**: compositori, parolieri, artisti, generi… si separano con punto e virgola e spazio, "Uno; Due".
 - **Copyright della registrazione (℗)**: negli MP3 ID3v2.4 va nel campo ufficiale TPRO. Negli MP3 ID3v2.3, che non ha un campo apposito, va in un campo personalizzato `PRODUCTION_COPYRIGHT`, con lo stesso nome usato nei FLAC.
 - **Campi personalizzati**, in fondo al gruppo Extra: si aggiungono con "+ Aggiungi un campo" e si tolgono con la ×. Il nome non può essere quello di un campo che esiste già (per esempio TITLE), e nei FLAC si scrive senza accenti e senza "=". I campi che non tocchi restano identici nel file.
+
+## Modifica a gruppi (dalla versione 0.7.0)
+- Nella pila ogni traccia ha una casella. Per scegliere più tracce:
+  - spunta le caselle;
+  - oppure ⌘ Cmd + clic sul Mac (Ctrl + clic su Windows e Linux) per aggiungerne una alla volta;
+  - oppure Maiuscole + clic per scegliere tutte quelle in mezzo;
+  - oppure "scegli tutte" in cima alla pila.
+- Con due o più tracce scelte compare la **scheda di gruppo**:
+  - i campi uguali in tutte mostrano il loro valore;
+  - dove c'è scritto **"valori diversi"**, ogni traccia tiene il suo valore, a meno che tu non scriva qualcosa: allora quel valore va in tutte;
+  - "svuota in tutte" toglie quel campo da tutte le tracce scelte.
+- **Titolo, codice ISRC e testo del brano** sono diversi per ogni brano: nella scheda di gruppo si possono solo leggere. Anche i campi personalizzati si modificano una traccia alla volta.
+- **Numerazione automatica**: spunta "Numera in ordine, partendo da 1". Le tracce vengono numerate nell'ordine della pila (cartella, disco, numero di traccia, nome del file). Il pulsante "usa N" mette come totale il numero delle tracce scelte.
+- **Stessa copertina per tutte**: dal pulsante sotto la foto, oppure trascinando un'immagine sulla pagina. Si possono anche togliere le copertine da tutte.
+- **Salva nelle tracce…** apre un'anteprima con un riquadro per ogni file e solo i campi che cambiano davvero. I file che hanno già quei valori non vengono toccati.
+- Si scrive **un file alla volta**, ognuno con la sua copia di sicurezza e la sua verifica dell'audio. Se un file dà un problema, Tag-liatelle si ferma: quelli già salvati restano salvati, gli altri restano com'erano. Le modifiche di gruppo rimangono nella scheda, e riprovando i file già a posto vengono saltati.
+- Le tracce con i dati rovinati, o con modifiche loro non ancora salvate, restano fuori dal gruppo: la scheda lo dice.
+- Un clic semplice su una traccia esce dal gruppo. Se ci sono modifiche di gruppo non salvate, prima chiede conferma.
+- Prima di scrivere, Tag-liatelle controlla che i tag del file siano ancora quelli letti all'apertura: se un altro programma li ha cambiati nel frattempo, si ferma e non sovrascrive il suo lavoro.
+- In Safari e Firefox la modifica a gruppi non c'è: lì si lavora una traccia alla volta e si scaricano le copie.
