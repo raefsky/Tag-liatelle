@@ -93,6 +93,7 @@
     if (id3.startsWith("TXXX:")) return f.nome === "TXXX" && f.leggibile && (f.descrizione || "").toUpperCase() === id3.slice(5);
     if (campo === "anno") return f.nome === "TYER" || f.nome === "TDRC";
     if (campo === "commenti") return f.nome === "COMM" && f.leggibile && f.descrizione === "";
+    if (campo === "copyrightRegistrazione") return f.nome === "TPRO" || (f.nome === "TXXX" && f.leggibile && (f.descrizione || "").toUpperCase() === "PRODUCTION_COPYRIGHT");
     return f.nome === id3;
   }
 
@@ -108,6 +109,8 @@
     const id3 = CAMPO[campo];
     if (id3.startsWith("TXXX:")) return frameTxxx(id3.slice(5), v, major);
     if (campo === "anno") return frameTesto(major === 4 ? "TDRC" : "TYER", v, major);
+    // ℗: ID3v2.4 ha il frame TPRO; ID3v2.3 no, quindi si usa un campo personalizzato con lo stesso nome dei FLAC
+    if (campo === "copyrightRegistrazione") return major === 4 ? frameTesto("TPRO", v, 4) : frameTxxx("PRODUCTION_COPYRIGHT", v, 3);
     if (campo === "commenti") return frameCommento("COMM", vecchio && vecchio.lingua, v, major);
     if (campo === "testo") return frameCommento("USLT", vecchio && vecchio.lingua, v, major);
     if (id3[0] === "W") return frameUrl(id3, v, major);
@@ -194,17 +197,7 @@
   }
 
   /** I valori dei campi dopo le modifiche (per l'anteprima e per la verifica). */
-  function valoriFinali(lettura, modifiche) {
-    const finali = { ...((lettura && lettura.campi) || {}) };
-    for (const [k, v] of Object.entries(modifiche)) {
-      if (k === COPERTINA) continue; // la copertina non è un campo di testo
-      const vuoto = v == null || (Array.isArray(v) ? !String(v[0] || "").trim() : !String(v).trim());
-      if (vuoto) delete finali[k];
-      else if (Array.isArray(v)) finali[k] = [String(v[0]).trim(), String(v[1] || "").trim()];
-      else finali[k] = String(v).trim();
-    }
-    return finali;
-  }
+  const valoriFinali = (lettura, modifiche) => Campi.valoriFinali(lettura && lettura.campi, modifiche);
 
   // ------------------------------------------------------------------
   // Costruzione del nuovo tag
@@ -222,13 +215,31 @@
     // con il solo ID3v1, il nuovo tag parte dai valori del vecchio
     if (!t && lettura.v1) modifiche = { ...lettura.campi, ...modifiche };
     const copertina = modifiche[COPERTINA] || null;
-    const campiCambiati = Object.keys(modifiche).filter((k) => k !== COPERTINA);
+    const nuoviPersonalizzati = modifiche.personalizzati || null;
+    const campiCambiati = Object.keys(modifiche).filter((k) => k !== COPERTINA && k !== "personalizzati");
+    // i frame dei campi personalizzati di prima: se l'elenco cambia, al posto del primo va l'elenco nuovo
+    const framePersonalizzati = new Set(nuoviPersonalizzati ? lettura.personalizzati.map((p) => p.sorgente).filter(Boolean) : []);
+    let personalizzatiScritti = false;
+    const scriviPersonalizzati = () => {
+      personalizzatiScritti = true;
+      for (const p of nuoviPersonalizzati) {
+        const nome = String(p.nome || "").trim(), valore = String(p.valore || "").trim();
+        if (!nome && !valore) continue;
+        const s = p.sorgente;
+        const uguale = s && framePersonalizzati.has(s) && s.descrizione === nome && s.testi.filter((x) => x !== "").join("; ") === valore;
+        pezzi.push(uguale && t.major !== 2 ? frameCom_era(s, t) : uguale ? daV22(s) : frameTxxx(nome, valore, major));
+      }
+    };
     const pezzi = [];
     const giaScritti = new Set();
     const bersagli = copertina ? immaginiDaToccare(t, copertina) : new Set();
     let copertinaScritta = false;
 
     for (const f of (t && t.frames) || []) {
+      if (framePersonalizzati.has(f)) {
+        if (!personalizzatiScritti) scriviPersonalizzati();
+        continue;
+      }
       if (bersagli.has(f)) {
         // la vecchia copertina frontale: al suo posto la nuova (o niente, se va tolta)
         if (copertina.azione === "sostituisci" && !copertinaScritta) { pezzi.push(frameCopertina(copertina, major)); copertinaScritta = true; }
@@ -252,6 +263,7 @@
       const nuovo = nuovoFrame(campo, modifiche[campo], major, null);
       if (nuovo) pezzi.push(nuovo);
     }
+    if (nuoviPersonalizzati && !personalizzatiScritti) scriviPersonalizzati();
     if (copertina && copertina.azione === "sostituisci" && !copertinaScritta) pezzi.push(frameCopertina(copertina, major));
 
     const corpo = unisci(...pezzi);

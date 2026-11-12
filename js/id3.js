@@ -69,6 +69,7 @@
     else PER_FRAME[c.id3] = c.id;
   }
   PER_FRAME.TDRC = "anno"; // ID3v2.4 tiene l'anno in TDRC
+  PER_TXXX.PRODUCTION_COPYRIGHT = "copyrightRegistrazione"; // ℗ in ID3v2.3, che non ha TPRO
 
   const ID_VALIDO = /^[A-Z0-9]{3,4}$/;
 
@@ -257,6 +258,9 @@
   const unisci = (testi) => testi.filter((t) => t !== "").join("; ");
   const numeroDi = (t) => { const [n = "", tot = ""] = t.split("/"); return [n.trim(), tot.trim()]; };
 
+  /** Ricorda da quale frame viene un dato, senza che compaia nei confronti e nelle copie. */
+  const conSorgente = (o, sorgente) => Object.defineProperty(o, "sorgente", { value: sorgente, enumerable: false });
+
   /**
    * @returns {{campi: object, immagini: Array, personalizzati: Array, altri: string[]}}
    *  - campi: i valori mostrati nell'interfaccia
@@ -280,7 +284,7 @@
       } else if (n === "TXXX") {
         const campo = PER_TXXX[f.descrizione.toUpperCase()];
         if (campo && !(campo in campi)) campi[campo] = unisci(f.testi);
-        else personalizzati.push({ nome: f.descrizione, valore: unisci(f.testi) });
+        else personalizzati.push(conSorgente({ nome: f.descrizione, valore: unisci(f.testi) }, f));
       } else if (n === "COMM") {
         if (!("commenti" in campi) && f.descrizione === "") campi.commenti = f.testo;
         else altri.push(n);
