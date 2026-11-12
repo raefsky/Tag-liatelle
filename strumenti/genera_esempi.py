@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Tag-liatelle · genera i file di prova in esempi/
-File MP3 piccolissimi (circa un secondo di silenzio) con tag di ogni tipo:
+File MP3 e FLAC piccolissimi (mezzo secondo di silenzio) con tag di ogni tipo
+(i FLAC sono descritti in strumenti/genera_flac.py). Per gli MP3:
 nessun tag, ID3v2.2, v2.3, v2.4, ID3v1, testi accentati in tutte le codifiche,
 copertine diverse, campi sconosciuti, "unsynchronisation", un tag rovinato.
 
@@ -10,7 +11,7 @@ così sono indipendenti sia dal codice dell'app sia da mutagen
 (mutagen serve poi a verificare che i file siano davvero validi).
 
 Uso:  python3 strumenti/genera_esempi.py
-Crea: esempi/*.mp3, esempi/atteso.json, test/esempi-dati.js
+Crea: esempi/*.mp3, esempi/*.flac, esempi/atteso.json, test/esempi-dati.js
 """
 import base64
 import json
@@ -310,11 +311,13 @@ def esempi(img):
 
 
 def main():
+    import genera_flac
     img = immagini()
     elenco = esempi(img)
+    elenco_flac = genera_flac.esempi(img, lambda: tag(3, [testo("TIT2", "Titolo ID3 da ignorare", 3)], riempimento=16))
     ESEMPI.mkdir(exist_ok=True)
     atteso = {}
-    for f in elenco:
+    for f in elenco + elenco_flac:
         (ESEMPI / f["nome"]).write_bytes(f["dati"])
         atteso[f["nome"]] = {"descrizione": f["descrizione"], **f["atteso"]}
         print(f"esempi/{f['nome']:<36} {len(f['dati']):>6} byte  · {f['descrizione']}")
@@ -324,6 +327,10 @@ def main():
     righe = ["/* creato da strumenti/genera_esempi.py: non modificare a mano */",
              "window.ESEMPI = ["]
     for f in elenco:
+        righe.append(f'  {{ nome: {json.dumps(f["nome"])}, base64: "{base64.b64encode(f["dati"]).decode()}" }},')
+    righe.append("];")
+    righe.append("window.ESEMPI_FLAC = [")
+    for f in elenco_flac:
         righe.append(f'  {{ nome: {json.dumps(f["nome"])}, base64: "{base64.b64encode(f["dati"]).decode()}" }},')
     righe.append("];")
     righe.append("window.ATTESO = " + json.dumps(atteso, ensure_ascii=False) + ";")

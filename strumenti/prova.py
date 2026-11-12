@@ -43,20 +43,124 @@ def browser():
 
 
 def esegui_nel_browser():
-    with tempfile.TemporaryDirectory() as profilo:
-        r = subprocess.run([browser(), "--headless=new", "--disable-gpu", f"--user-data-dir={profilo}",
-                            "--allow-file-access-from-files", "--virtual-time-budget=20000", "--dump-dom",
-                            (RADICE / "test" / "index.html").as_uri()],
-                           capture_output=True, text=True, timeout=120)
-    dom = r.stdout
+    """
+    Apre test/index.html nel browser senza finestra e aspetta il risultato.
+    La pagina viene servita da un piccolo server che vive solo dentro questo
+    script e risponde solo a questo computer (127.0.0.1): quando le prove
+    finiscono, la pagina gli consegna il risultato. Niente esce dal computer.
+    """
+    import functools
+    import http.server
+    import threading
 
-    def blocco(id_):
-        m = re.search(rf'<pre id="{id_}">(.*?)</pre>', dom, re.S)
-        return json.loads(html.unescape(m.group(1))) if m and m.group(1).strip() else None
-    return blocco("esito"), blocco("letture"), blocco("scritti")
+    ricevuto = {}
+    arrivato = threading.Event()
+
+    class Servitore(http.server.SimpleHTTPRequestHandler):
+        def do_POST(self):
+            corpo = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            ricevuto.update(json.loads(corpo.decode("utf-8")))
+            self.send_response(204)
+            self.end_headers()
+            arrivato.set()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Servitore, directory=str(RADICE)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    indirizzo = f"http://127.0.0.1:{server.server_address[1]}/test/index.html?consegna=1"
+    with tempfile.TemporaryDirectory() as profilo:
+        processo = subprocess.Popen([browser(), "--headless=new", "--disable-gpu", f"--user-data-dir={profilo}",
+                                     "--no-first-run", indirizzo],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            arrivato.wait(timeout=120)
+        finally:
+            processo.terminate()
+            try:
+                processo.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                processo.kill()
+            server.shutdown()
+    return ricevuto.get("esito"), ricevuto.get("letture"), ricevuto.get("scritti")
+
+
+# ---------------------------------------------------------------------------
+# FLAC: tabella scritta qui, indipendente da quella dell'app (js/campi.js)
+# ---------------------------------------------------------------------------
+VORBIS = {
+    "TITLE": "titolo", "ARTIST": "artista", "ALBUM": "album", "DATE": "anno", "YEAR": "anno", "GENRE": "genere",
+    "TRACKNUMBER": "traccia", "DISCNUMBER": "disco",
+    "ALBUMARTIST": "artistaAlbum", "ALBUM ARTIST": "artistaAlbum", "COMPOSER": "compositore", "LYRICIST": "paroliere",
+    "CONDUCTOR": "direttore", "REMIXER": "remixer", "SUBTITLE": "sottotitolo", "GROUPING": "raggruppamento",
+    "LANGUAGE": "lingua", "LYRICS": "testo", "UNSYNCEDLYRICS": "testo",
+    "COPYRIGHT": "copyright", "PRODUCTION_COPYRIGHT": "copyrightRegistrazione",
+    "ORGANIZATION": "editore", "LABEL": "editore", "PUBLISHER": "editore",
+    "CATALOGNUMBER": "catalogo", "BARCODE": "codiceBarre", "UPC": "codiceBarre", "EAN": "codiceBarre", "ISRC": "isrc",
+    "WEBSITE": "sitoArtista", "URL": "sitoArtista", "WWWARTIST": "sitoArtista", "WWWPUBLISHER": "sitoEtichetta",
+    "BPM": "bpm", "INITIALKEY": "tonalita", "KEY": "tonalita", "COMPILATION": "compilation",
+    "ENCODEDBY": "codificatoDa", "ENCODED-BY": "codificatoDa", "COMMENT": "commenti", "DESCRIPTION": "commenti",
+}
+TOTALI = {"TRACKTOTAL": "traccia", "TOTALTRACKS": "traccia", "DISCTOTAL": "disco", "TOTALDISCS": "disco"}
+
+
+def lettura_mutagen_flac(percorso):
+    from mutagen.flac import FLAC
+    f = FLAC(percorso)
+    valori, numeri = {}, {}
+    for nome, valore in (f.tags or []):          # in mutagen i commenti sono coppie (nome, valore), in ordine
+        n = nome.upper()
+        if n == "LICENSE":
+            campo = "sitoLicenza" if valore.strip().lower().startswith(("http://", "https://")) else "licenza"
+        else:
+            campo = TOTALI.get(n) or VORBIS.get(n)
+        if not campo:
+            continue
+        if campo in ("traccia", "disco"):
+            x = numeri.setdefault(campo, {})
+            if n in TOTALI:
+                x.setdefault("tot", valore.strip())
+            elif "n" not in x:
+                a, _, b = valore.partition("/")
+                x["n"] = a.strip()
+                if b.strip():
+                    x["insieme"] = b.strip()
+            continue
+        valori.setdefault(campo, []).append((n, valore))
+    campi = {}
+    for campo, lista in valori.items():
+        if campo == "anno":
+            campi[campo] = lista[0][1].strip()[:4]
+            continue
+        tenuti = [v for i, (n, v) in enumerate(lista) if not any(v2 == v and n2 != n for n2, v2 in lista[:i])]
+        campi[campo] = "; ".join(v for v in tenuti if v != "")
+    for campo, x in numeri.items():
+        campi[campo] = [x.get("n", ""), x["tot"] if "tot" in x else x.get("insieme", "")]
+    immagini = [{"tipo": int(p.type), "mime": p.mime, "byte": len(p.data)} for p in f.pictures]
+    return {"campi": campi, "immagini": immagini, "durata": f.info.length}
+
+
+def audio_flac(dati):
+    """Dove comincia e dove finisce l'audio di un FLAC: calcolato qui, senza il codice dell'app."""
+    pos = 0
+    if dati[:3] == b"ID3":
+        b = dati[6:10]
+        pos = 10 + ((b[0] << 21) | (b[1] << 14) | (b[2] << 7) | b[3])
+    assert dati[pos:pos + 4] == b"fLaC", "manca la sigla fLaC"
+    pos += 4
+    while True:
+        ultimo = dati[pos] & 0x80
+        pos += 4 + int.from_bytes(dati[pos + 1:pos + 4], "big")
+        if ultimo:
+            break
+    fine = len(dati) - 128 if dati[-128:-125] == b"TAG" else len(dati)
+    return pos, fine
 
 
 def lettura_mutagen(percorso):
+    if percorso.lower().endswith(".flac"):
+        return lettura_mutagen_flac(percorso)
     from mutagen.id3 import ID3, ID3NoHeaderError
     try:
         tags = ID3(percorso, load_v1=False)
@@ -110,8 +214,17 @@ def main():
 
     print("2) Confronto indipendente con mutagen")
     differenze = 0
+    atteso = json.loads((RADICE / "esempi" / "atteso.json").read_text(encoding="utf-8"))
     for nome, nostra in sorted((letture or {}).items()):
-        loro = lettura_mutagen(str(RADICE / "esempi" / nome))
+        try:
+            loro = lettura_mutagen(str(RADICE / "esempi" / nome))
+        except Exception as e:
+            if atteso.get(nome, {}).get("avvisi"):
+                print(f"   – {nome}  (rovinato apposta: mutagen si rifiuta di leggerlo, noi avvisiamo)")
+            else:
+                differenze += 1
+                print(f"   ✗ {nome}\n     mutagen non riesce a leggerlo: {e}")
+            continue
         problemi = []
         if nostra["campi"] != loro["campi"]:
             for k in sorted(set(nostra["campi"]) | set(loro["campi"])):
@@ -134,7 +247,9 @@ def main():
     with tempfile.TemporaryDirectory() as cartella:
         for nome, s in sorted((scritti or {}).items()):
             dati = base64.b64decode(s["base64"])
-            percorso = Path(cartella) / nome.replace("#", "-")
+            flac = nome.split("#")[0].lower().endswith(".flac")
+            base, _, variante = nome.partition("#")
+            percorso = Path(cartella) / (Path(base).stem + ("-" + variante if variante else "") + Path(base).suffix)
             percorso.write_bytes(dati)
             problemi = []
             loro = lettura_mutagen(str(percorso))
@@ -144,16 +259,22 @@ def main():
                         problemi.append(f"{k}: atteso {s['campi'].get(k)!r}, mutagen {loro['campi'].get(k)!r}")
             if "immagini" in s and loro["immagini"] != s["immagini"]:
                 problemi.append(f"immagini: attese {s['immagini']}, mutagen {loro['immagini']}")
-            from mutagen.id3 import ID3
-            versione = "2.%d" % ID3(str(percorso), load_v1=False).version[1]
-            if versione != s["versione"]:
-                problemi.append(f"versione: attesa {s['versione']}, mutagen {versione}")
-            # audio: calcolato qui in Python, senza usare il codice di Tag-liatelle
-            inizio = 0
-            if dati[:3] == b"ID3":
-                b = dati[6:10]
-                inizio = 10 + ((b[0] << 21) | (b[1] << 14) | (b[2] << 7) | b[3])
-            fine = len(dati) - 128 if dati[-128:-125] == b"TAG" else len(dati)
+            if flac:
+                versione = "FLAC"
+                if abs(loro["durata"] - 6 * 4096 / 44100) > 0.001:
+                    problemi.append(f"durata: {loro['durata']:.3f} s, diversa dall'originale")
+                inizio, fine = audio_flac(dati)
+            else:
+                from mutagen.id3 import ID3
+                versione = "v2.%d" % ID3(str(percorso), load_v1=False).version[1]
+                if versione != "v" + s["versione"]:
+                    problemi.append(f"versione: attesa {s['versione']}, mutagen {versione}")
+                # audio: calcolato qui in Python, senza usare il codice di Tag-liatelle
+                inizio = 0
+                if dati[:3] == b"ID3":
+                    b = dati[6:10]
+                    inizio = 10 + ((b[0] << 21) | (b[1] << 14) | (b[2] << 7) | b[3])
+                fine = len(dati) - 128 if dati[-128:-125] == b"TAG" else len(dati)
             originale = (RADICE / "esempi" / nome.split("#")[0]).read_bytes()[s["audio"]["inizio"]:s["audio"]["fine"]]
             if dati[inizio:fine] != originale:
                 problemi.append("l'audio NON è identico all'originale")
@@ -163,7 +284,7 @@ def main():
                 for p in problemi:
                     print("     " + p)
             else:
-                print(f"   ✓ {nome}  (v{versione}, audio identico)")
+                print(f"   ✓ {nome}  ({versione}, audio identico)")
     if not scritti:
         differenze += 1
         print("   nessun file scritto ricevuto dal browser")

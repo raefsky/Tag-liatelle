@@ -29,7 +29,7 @@
     const l = await Id3.leggiMp3DaByte(byteDa64(ESEMPI.find((e) => e.nome.startsWith("04")).base64));
     const png = l.immagini.find((i) => i.mime === "image/png");
     const jpg = l.immagini.find((i) => i.mime === "image/jpeg");
-    uguale(Immagini.misure(png.dati), { formato: "PNG", larghezza: 16, altezza: 16 }, "PNG");
+    uguale(Immagini.misure(png.dati), { formato: "PNG", larghezza: 16, altezza: 16, profondita: 24 }, "PNG");
     const m = Immagini.misure(jpg.dati);
     uguale([m.formato, m.larghezza, m.altezza, m.progressivo], ["JPEG", 16, 16, false], "JPEG");
     uguale(Immagini.misure(new Uint8Array([1, 2, 3])), null, "non immagine");
@@ -57,7 +57,8 @@
     for (let i = 0; i + 1 < jpg.length; i++) if (jpg[i] === 0xFF && jpg[i + 1] === 0xC2) { progressivo = true; break; }
     vero(!progressivo, "niente SOF2");
     const png = await Immagini.produci(sorgente, a, 500, "image/png", 90);
-    uguale(Immagini.misure(png), { formato: "PNG", larghezza: 500, altezza: 500 }, "PNG");
+    const mp = Immagini.misure(png);
+    uguale([mp.formato, mp.larghezza, mp.altezza], ["PNG", 500, 500], "PNG");
   });
 
   prova("avvisi: immagine piccola e copertina pesante", () => {

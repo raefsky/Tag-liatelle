@@ -4,9 +4,10 @@
      1. permesso di scrittura (sulla cartella del file);
      2. il file è ancora quello che abbiamo letto? altrimenti ci si ferma;
      3. COPIA DI SICUREZZA in "Tag-liatelle copie" (e verifica della copia);
-     4. scrittura: nuovo tag + audio originale + ID3v1. Il browser scrive in un
-        file temporaneo e lo sostituisce all'originale solo alla fine: se
-        qualcosa va storto a metà, l'originale resta intatto;
+     4. scrittura dei nuovi tag (MP3 o FLAC: vedi formati.js), con l'audio
+        originale. Il browser scrive in un file temporaneo e lo sostituisce
+        all'originale solo alla fine: se qualcosa va storto a metà,
+        l'originale resta intatto;
      5. VERIFICA: si rilegge il file; i campi devono essere quelli voluti e
         l'audio identico, byte per byte (impronta SHA-256). Se no, si
         rimette automaticamente la copia di sicurezza.
@@ -40,6 +41,17 @@
     const w = await maniglia.createWritable();
     try {
       await w.write(contenuto);
+      await w.close();
+    } catch (e) {
+      try { await w.abort(); } catch (e2) { /* già chiuso */ }
+      throw e;
+    }
+  }
+  /** Scrive solo un pezzo dentro il file, lasciando com'è tutto il resto. */
+  async function scriviPezzo(maniglia, posizione, dati) {
+    const w = await maniglia.createWritable({ keepExistingData: true });
+    try {
+      await w.write({ type: "write", position: posizione, data: dati });
       await w.close();
     } catch (e) {
       try { await w.abort(); } catch (e2) { /* già chiuso */ }
@@ -119,13 +131,14 @@
     if (traccia.file && (prima.size !== traccia.file.size || prima.lastModified !== traccia.file.lastModified)) {
       throw new ErroreChiaro("Il file è stato cambiato da un altro programma dopo l'apertura. Per sicurezza non salvo: riaprilo e riprova.");
     }
-    const lettura = await Id3.leggiMp3(Apertura.lettorePezzi(prima), prima.size);
-    const c = Id3Scrittura.controlla(lettura, opzioni);
+    const formato = Formati.per(traccia.formato);
+    const lettura = await formato.leggi(Apertura.lettorePezzi(prima), prima.size);
+    const c = formato.controlla(lettura, opzioni);
     if (!c.ok) throw new ErroreChiaro(c.motivo);
-    const nuovo = Id3Scrittura.costruisci(lettura, modifiche, opzioni);
-    const attesi = Id3Scrittura.valoriFinali(lettura, !lettura.tag && lettura.v1 ? { ...lettura.campi, ...modifiche } : modifiche);
-    const audio = prima.slice(lettura.audio.inizio, lettura.audio.fine);
-    const improntaAudio = await impronta(audio);
+    let nuovo;
+    try { nuovo = formato.prepara(lettura, modifiche, opzioni); }
+    catch (e) { throw new ErroreChiaro(e.message + " Il file non è stato toccato."); }
+    const improntaAudio = await impronta(prima.slice(lettura.audio.inizio, lettura.audio.fine));
     const improntaFile = await impronta(prima);
 
     // 3. copia di sicurezza
@@ -142,23 +155,29 @@
     }
 
     // 4. scrittura
+    //    "sul posto": i nuovi tag occupano lo stesso spazio dei vecchi, quindi si scrive
+    //    solo quel pezzo e l'audio non si sposta. Altrimenti si scrive il file intero.
+    //    In tutti e due i casi il browser lavora su un file temporaneo e lo sostituisce
+    //    all'originale solo alla fine.
     passo("scrittura");
-    await scriviFile(maniglia, new Blob([nuovo.tag, audio, nuovo.v1 || new Uint8Array(0)]));
+    const nuovoFile = new Blob(nuovo.parti(prima));
+    if (nuovo.sulPosto && nuovoFile.size === prima.size) await scriviPezzo(maniglia, nuovo.sulPosto.posizione, nuovo.sulPosto.dati);
+    else await scriviFile(maniglia, nuovoFile);
 
     // 5. verifica
     passo("verifica");
     const dopo = await maniglia.getFile();
-    const riletto = await Id3.leggiMp3(Apertura.lettorePezzi(dopo), dopo.size);
+    const riletto = await formato.leggi(Apertura.lettorePezzi(dopo), dopo.size);
     const problemi = [];
-    if (riletto.avvisi.length) problemi.push("il tag scritto non si rilegge bene");
-    if (JSON.stringify(ordina(riletto.campi)) !== JSON.stringify(ordina(attesi))) problemi.push("i campi riletti non sono quelli voluti");
+    if (riletto.avvisi.length) problemi.push("i tag scritti non si rileggono bene");
+    if (dopo.size !== nuovoFile.size) problemi.push("la dimensione del file non è quella prevista");
+    if (JSON.stringify(ordina(riletto.campi)) !== JSON.stringify(ordina(nuovo.attesi))) problemi.push("i campi riletti non sono quelli voluti");
     if ((await impronta(dopo.slice(riletto.audio.inizio, riletto.audio.fine))) !== improntaAudio) problemi.push("l'audio non è identico a prima");
-    // il tag sul disco deve essere esattamente quello preparato (campi, copertina, tutto)
-    const testa = new Uint8Array(await dopo.slice(0, nuovo.tag.length).arrayBuffer());
-    if (testa.length !== nuovo.tag.length || testa.some((x, i) => x !== nuovo.tag[i])) problemi.push("il tag sul disco non è quello preparato");
-    if (nuovo.v1) {
-      const coda = new Uint8Array(await dopo.slice(dopo.size - 128).arrayBuffer());
-      if (coda.some((x, i) => x !== nuovo.v1[i])) problemi.push("il vecchio tag ID3v1 non è quello preparato");
+    // i tag sul disco devono essere esattamente quelli preparati (campi, copertina, tutto)
+    for (const k of nuovo.controlli) {
+      const da = k.posizione < 0 ? dopo.size + k.posizione : k.posizione;
+      const letti = new Uint8Array(await dopo.slice(da, da + k.dati.length).arrayBuffer());
+      if (letti.length !== k.dati.length || letti.some((x, i) => x !== k.dati[i])) { problemi.push("i tag sul disco non sono quelli preparati"); break; }
     }
     if (problemi.length) {
       // qualcosa non torna: si rimette subito la copia
@@ -168,7 +187,7 @@
       throw new ErroreChiaro(`Dopo il salvataggio ho trovato un problema (${problemi.join("; ")}). ` +
         (ok ? "Ho rimesso il file com'era prima, usando la copia di sicurezza." : `ATTENZIONE: non sono riuscito a rimettere il file com'era. La copia di sicurezza è in «${COPIE}/${nomeCopia}».`));
     }
-    return { file: dopo, lettura: riletto, copia: nomeCopia, note: nuovo.note };
+    return { file: dopo, lettura: riletto, copia: nomeCopia, note: nuovo.note, sulPosto: !!nuovo.sulPosto };
   }
 
   function ordina(o) {
@@ -225,7 +244,7 @@
     passo("verifica");
     const dopo = await maniglia.getFile();
     if ((await impronta(dopo)) !== improntaCopia) throw new ErroreChiaro(`Il ripristino non è riuscito. La copia è ancora in «${COPIE}».`);
-    return { file: dopo, lettura: await Id3.leggiMp3(Apertura.lettorePezzi(dopo), dopo.size) };
+    return { file: dopo, lettura: await Formati.per(traccia.formato).leggi(Apertura.lettorePezzi(dopo), dopo.size) };
   }
 
   /** Cancella le copie di un file (definitivamente) e la cartella delle copie, se resta vuota. */
@@ -255,11 +274,14 @@
   // ------------------------------------------------------------------
   async function copiaDaScaricare(traccia, modifiche, opzioni = {}) {
     const f = traccia.file;
-    const lettura = await Id3.leggiMp3(Apertura.lettorePezzi(f), f.size);
-    const nuovo = Id3Scrittura.costruisci(lettura, modifiche, opzioni);
-    const blob = new Blob([nuovo.tag, f.slice(lettura.audio.inizio, lettura.audio.fine), nuovo.v1 || new Uint8Array(0)], { type: f.type || "audio/mpeg" });
+    const formato = Formati.per(traccia.formato);
+    const lettura = await formato.leggi(Apertura.lettorePezzi(f), f.size);
+    let nuovo;
+    try { nuovo = formato.prepara(lettura, modifiche, opzioni); }
+    catch (e) { throw new ErroreChiaro(e.message); }
+    const blob = new Blob(nuovo.parti(f), { type: f.type || formato.mime });
     // verifica prima di consegnarla
-    const riletto = await Id3.leggiMp3(Apertura.lettorePezzi(blob), blob.size);
+    const riletto = await formato.leggi(Apertura.lettorePezzi(blob), blob.size);
     const prima = await impronta(f.slice(lettura.audio.inizio, lettura.audio.fine));
     const dopo = await impronta(blob.slice(riletto.audio.inizio, riletto.audio.fine));
     if (prima !== dopo || riletto.avvisi.length) throw new ErroreChiaro("La copia modificata non ha superato la verifica: non la scarico.");

@@ -1,6 +1,6 @@
 /* ==========================================================================
    Tag-liatelle · interfaccia
-   Apre cartelle e file (con i pulsanti o trascinandoli), legge i tag MP3,
+   Apre cartelle e file (con i pulsanti o trascinandoli), legge i tag MP3 e FLAC,
    mostra la pila di schede e la scheda grande; modifica il gruppo Base e
    salva in modo sicuro (anteprima, copia di sicurezza, verifica, ripristino).
    ========================================================================== */
@@ -107,7 +107,7 @@
   const nomeFormatoImmagine = (mime) => ({ "image/jpeg": "JPEG", "image/png": "PNG", "image/gif": "GIF", "image/webp": "WebP", "image/bmp": "BMP" }[mime] || mime);
 
   // ---------- Le tracce aperte ----------
-  // ogni traccia: { nome, percorso, file, maniglia, formato, stato: "lettura"|"letto"|"errore"|"attesa", lettura }
+  // ogni traccia: { nome, percorso, file, maniglia, formato, stato: "lettura"|"letto"|"errore", lettura }
   let tracce = [];
   let corrente = -1;
   let inLettura = 0;
@@ -146,16 +146,12 @@
     disegnaPila();
     let fatti = 0;
     for (const t of daLeggere) {
-      if (t.formato === "FLAC") {
-        t.stato = "attesa"; // la lettura dei FLAC arriva nel blocco 5
-      } else {
-        try {
-          t.lettura = await Id3.leggiMp3(Apertura.lettorePezzi(t.file), t.file.size);
-          t.stato = "letto";
-        } catch (e) {
-          t.stato = "errore";
-          t.errore = String((e && e.message) || e);
-        }
+      try {
+        t.lettura = await Formati.per(t.formato).leggi(Apertura.lettorePezzi(t.file), t.file.size);
+        t.stato = "letto";
+      } catch (e) {
+        t.stato = "errore";
+        t.errore = String((e && e.message) || e);
       }
       fatti++;
       inLettura--;
@@ -212,6 +208,7 @@
     profondita = 0;
     document.body.classList.remove("trascino");
     const dt = e.dataTransfer;
+    if (document.querySelector("dialog[open]")) return; // con una finestrella aperta non si apre altro
     // un'immagine trascinata diventa la copertina della scheda aperta
     const files = Array.from(dt.files || []);
     const imm = files.find((f) => /^image\//.test(f.type));
@@ -249,8 +246,7 @@
     const lista = el("ol", { classe: "elenco", "aria-label": "Tracce aperte" });
     tracce.forEach((t, i) => {
       const c = (t.lettura && t.lettura.campi) || {};
-      const sotto = t.stato === "attesa" ? "FLAC: lettura in arrivo"
-        : t.stato === "errore" ? "non riesco a leggerlo"
+      const sotto = t.stato === "errore" ? "non riesco a leggerlo"
         : t.stato === "lettura" ? "lettura…"
         : c.artista || "artista sconosciuto";
       lista.append(el("li", {},
@@ -289,7 +285,7 @@
     const campi = (l && l.campi) || {};
     if (!t.modifiche) t.modifiche = {};
     const numeroScheda = String(corrente + 1).padStart(3, "0");
-    const versione = !l ? "" : l.tag ? "ID3v" + l.tag.versione + (l.v1 ? " + ID3v1" : "") : l.v1 ? "solo ID3v1" : "nessun tag";
+    const versione = l ? Formati.per(t.formato).etichetta(l) : "";
     const inventario = [`Scheda n. ${numeroScheda}`, t.formato, versione, misura(t.file.size)].filter(Boolean).join(" · ");
 
     c.append(
@@ -304,19 +300,15 @@
       )
     );
 
-    if (t.stato === "attesa") {
-      c.append(el("p", { classe: "nota-esempio", testo: "Questo è un file FLAC: Tag-liatelle imparerà a leggerlo nella prossima versione. Per ora il file resta com'è." }));
-      return;
-    }
     if (t.stato === "errore") {
-      c.append(riquadroAvvisi(["Non riesco a leggere questo file. Potrebbe essere rovinato, oppure non è davvero un MP3. Il file non è stato toccato.", t.errore]));
+      c.append(riquadroAvvisi([`Non riesco a leggere questo file. Potrebbe essere rovinato, oppure non è davvero un ${t.formato}. Il file non è stato toccato.`, t.errore]));
       return;
     }
     if (l && l.avvisi.length) c.append(riquadroAvvisi(l.avvisi));
-    if (l && !l.tag && !l.v1) c.append(el("p", { classe: "nota-esempio", testo: "Questo file non ha ancora nessun tag: è una tagliatella senza etichetta." }));
+    if (l && !l.avvisi.length && Formati.per(t.formato).senzaTag(l)) c.append(el("p", { classe: "nota-esempio", testo: "Questo file non ha ancora nessun tag: è una tagliatella senza etichetta." }));
 
-    const controllo = l ? Id3Scrittura.controlla(l) : { ok: false, motivo: "" };
-    const modificabile = t.formato === "MP3" && t.stato === "letto" && controllo.ok;
+    const controllo = l ? Formati.per(t.formato).controlla(l) : { ok: false, motivo: "" };
+    const modificabile = t.stato === "letto" && controllo.ok;
     if (l && !controllo.ok && controllo.motivo) c.append(riquadroAvvisi([controllo.motivo]));
     if (!t.modifiche) t.modifiche = {};
 
@@ -351,7 +343,7 @@
     const imm = (l && l.immagini) || [];
     const fronte = imm.find((i) => i.tipo === 3) || imm[0];
     const modifica = t && t.modifiche && t.modifiche.copertina;
-    const modificabile = t && t.formato === "MP3" && t.stato === "letto" && l && Id3Scrittura.controlla(l).ok;
+    const modificabile = t && t.stato === "letto" && l && Formati.per(t.formato).controlla(l).ok;
     const altre = imm.filter((i) => i !== fronte);
     const restano = modifica ? imm.filter((i) => i.tipo !== 3 && !(modifica.azione === "rimuovi" && i === fronte)) : altre;
 
@@ -442,7 +434,9 @@
     const nomi = [...new Set(altri)].join(", ");
     return el("p", { classe: "conservati" },
       icona("timbro"),
-      `Nel file ci sono anche ${altri.length} ${altri.length === 1 ? "dato" : "dati"} che Tag-liatelle non mostra (${nomi}). Verranno conservati così come sono.`);
+      altri.length === 1
+        ? `Nel file c'è anche un dato che Tag-liatelle non mostra (${nomi}). Verrà conservato così com'è.`
+        : `Nel file ci sono anche ${altri.length} dati che Tag-liatelle non mostra (${nomi}). Verranno conservati così come sono.`);
   }
 
   function personalizzati(lista) {
@@ -535,7 +529,7 @@
   function apriAnteprima(t) {
     if (!quanteModifiche(t) || salvataggioInCorso) return;
     const l = t.lettura;
-    const controllo = Id3Scrittura.controlla(l);
+    const controllo = Formati.per(t.formato).controlla(l);
     if (!controllo.ok) { avvisa(controllo.motivo, 9000); return; }
     const corpo = $("#anteprima-corpo");
     corpo.replaceChildren();
@@ -559,9 +553,13 @@
         el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(nessuna)" }),
         el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolta)" })));
     }
+    // prova generale: si prepara tutto subito, così un eventuale problema si vede prima di scrivere
+    let preparato;
+    try { preparato = Formati.per(t.formato).prepara(l, t.modifiche); }
+    catch (e) { avvisa(((e && e.message) || String(e)) + " Il file non è stato toccato.", 9000); return; }
     // la nota su ID3v1 serve solo se cambia un campo che ID3v1 contiene
     const campiV1 = ["titolo", "artista", "album", "anno", "traccia", "genere"];
-    const note = controllo.note.filter((n) => !n.includes("ID3v1, alla fine") || campiV1.some((k) => k in t.modifiche));
+    const note = preparato.note.filter((n) => !n.includes("ID3v1, alla fine") || campiV1.some((k) => k in t.modifiche));
     if (cop) note.push("Le altre immagini del file (retro, libretto…) restano come sono.");
     if (t.maniglia) {
       note.unshift(`Prima di scrivere faccio una copia di sicurezza del file nella cartella «${Salvataggio.COPIE}», accanto al file.`);
@@ -586,7 +584,7 @@
     finestraAnteprima.showModal();
   }
 
-  const NOMI_PASSI = { controllo: "Controllo che il file non sia cambiato", copia: "Copia di sicurezza", scrittura: "Scrittura del nuovo tag", verifica: "Verifica: tag riletto e audio identico" };
+  const NOMI_PASSI = { controllo: "Controllo che il file non sia cambiato", copia: "Copia di sicurezza", scrittura: "Scrittura dei nuovi tag", verifica: "Verifica: tag riletto e audio identico" };
 
   async function eseguiSalvataggio(t) {
     salvataggioInCorso = true;
