@@ -329,6 +329,7 @@
     const modificabile = t.stato === "letto" && controllo.ok;
     if (l && !controllo.ok && controllo.motivo) c.append(riquadroAvvisi([controllo.motivo]));
     if (!t.modifiche) t.modifiche = {};
+    if (modificabile) c.append(rigaModelli(valoriTraccia(t)));
 
     for (const g of Campi.GRUPPI) {
       const pieni = g.campi.filter((campo) => vuoto(campi[campo.id]) === false).length;
@@ -545,7 +546,7 @@
   }
 
   /** Il menu delle licenze Creative Commons: compila insieme il nome e la pagina della licenza. */
-  function sceltaLicenza(traccia) {
+  function sceltaLicenza(traccia, prefisso = "campo-") {
     const menu = el("select", { classe: "licenza-rapida", "aria-label": "Scelta rapida della licenza" },
       el("option", { value: "", testo: "Scelta rapida: Creative Commons…" }),
       Campi.LICENZE.map((l) => el("option", { value: l.nome, testo: `${l.nome} — ${l.spiega}` })));
@@ -553,7 +554,7 @@
       const l = Campi.LICENZE.find((x) => x.nome === menu.value);
       if (!l) return;
       for (const [id, valore] of [["licenza", l.nome], ["sitoLicenza", l.url]]) {
-        const c = $("#campo-" + id);
+        const c = $("#" + prefisso + id);
         if (c) { c.value = valore; c.dispatchEvent(new Event("input")); }
       }
       menu.value = "";
@@ -985,6 +986,7 @@
     if (utili.length < 2) { c.append(el("p", { classe: "nota-esempio", testo: "Per la modifica a gruppi servono almeno due tracce modificabili." })); return; }
 
     const riassunto = Gruppo.riassumi(utili.map((t) => t.lettura));
+    c.append(rigaModelli(valoriGruppo(utili)));
     for (const g of Campi.GRUPPI) {
       const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampoGruppo(campo, riassunto.campi[campo.id], utili)));
       if (g.id === "extra") griglia.append(el("p", { classe: "campo largo nota-piccola", testo: "I campi personalizzati si modificano una traccia alla volta." }));
@@ -1284,6 +1286,190 @@
     }
   }
 
+  // ==========================================================================
+  // MODELLI DI EDIZIONE
+  // ==========================================================================
+  let modelli = Modelli.leggi();
+  function conservaModelli(lista) {
+    modelli = lista;
+    if (!Modelli.scrivi(lista)) avvisa("Questo browser non lascia conservare i modelli: restano finché la pagina è aperta. Esportali in un file per non perderli.", 9000);
+  }
+
+  /** Dove si può applicare un modello adesso: { tipo: "gruppo" } | { tipo: "traccia", t } | null */
+  function destinazioneModello() {
+    if (inGruppo()) {
+      const utili = tracceScelte().filter((t) => !escluso(t));
+      return utili.length >= 2 && utili.every((t) => t.maniglia) ? { tipo: "gruppo", utili } : null;
+    }
+    const t = tracce[corrente];
+    if (!t || t.stato !== "letto" || !Formati.per(t.formato).controlla(t.lettura).ok) return null;
+    return { tipo: "traccia", t };
+  }
+
+  function applicaModello(m) {
+    const dove = destinazioneModello();
+    if (!dove) { avvisa("Apri prima una traccia (o scegli più tracce) che si può modificare."); return; }
+    let cambiati;
+    if (dove.tipo === "gruppo") {
+      const r = Modelli.applica(m, gruppo.modifiche, null);
+      gruppo.modifiche = r.modifiche; cambiati = r.cambiati;
+    } else {
+      const r = Modelli.applica(m, dove.t.modifiche, dove.t.lettura.campi);
+      dove.t.modifiche = r.modifiche; cambiati = r.cambiati;
+    }
+    disegnaPila(); disegnaScheda();
+    avvisa(cambiati
+      ? `Modello «${m.nome}» applicato: ${cambiati} ${cambiati === 1 ? "campo cambiato" : "campi cambiati"}. Controlla e premi Salva: finché non salvi, i file restano come sono.`
+      : `Il modello «${m.nome}» non cambia niente: ${dove.tipo === "gruppo" ? "le tracce" : "la traccia"} ha già questi valori.`, 8000);
+  }
+
+  /** La riga dei modelli in cima ai campi della scheda (singola o di gruppo). */
+  function rigaModelli(valoriPerNuovo) {
+    const menu = el("select", { "aria-label": "Modello di edizione da applicare" },
+      el("option", { value: "", testo: modelli.length ? "Scegli un modello…" : "Nessun modello salvato" }),
+      modelli.map((m, i) => el("option", { value: String(i), testo: m.nome })));
+    menu.disabled = !modelli.length;
+    const applica = el("button", { classe: "bottone leggero mini", type: "button", disabled: true,
+      suclick: () => { const m = modelli[+menu.value]; if (m) applicaModello(m); } }, "Applica");
+    menu.addEventListener("change", () => { applica.disabled = menu.value === ""; });
+    return el("div", { classe: "riga-modelli" },
+      el("span", { classe: "etichetta", testo: "Modello di edizione" }),
+      menu, applica,
+      el("button", { classe: "bottone leggero mini", type: "button", suclick: () => apriEditorModello(null, valoriPerNuovo()) }, "Salva come modello…"),
+      el("button", { classe: "bottone leggero mini", type: "button", suclick: apriModelli }, "Gestisci…"));
+  }
+
+  // ---------- finestra "Modelli di edizione" ----------
+  const finestraModelli = $("#modelli");
+  function disegnaElencoModelli(rapporto) {
+    const box = $("#elenco-modelli");
+    box.replaceChildren();
+    if (rapporto && rapporto.length) box.append(el("div", { classe: "rapporto-importazione" }, el("b", { testo: "Importazione" }), el("ul", {}, rapporto.map((r) => el("li", { testo: r })))));
+    if (!modelli.length) {
+      box.append(el("p", { classe: "nota-esempio", testo: "Ancora nessun modello. Creane uno con «Nuovo modello», oppure dalla scheda di una traccia con «Salva come modello»: prende i valori che hai già scritto." }));
+      return;
+    }
+    const dove = destinazioneModello();
+    box.append(...modelli.map((m, i) => el("section", { classe: "modello" },
+      el("h3", { testo: m.nome }),
+      el("dl", {}, Object.entries(m.campi).flatMap(([id, v]) => {
+        const c = Campi.TUTTI.find((x) => x.id === id);
+        return [el("dt", { testo: c ? c.etichetta : id }), el("dd", { testo: id === "compilation" ? (v === "1" ? "sì" : "no") : v })];
+      })),
+      el("p", { classe: "bottoni-copie" },
+        el("button", { classe: "bottone leggero", type: "button", disabled: !dove, title: dove ? "" : "Apri prima una traccia o scegli più tracce",
+          suclick: () => { finestraModelli.close(); applicaModello(m); } }, dove && dove.tipo === "gruppo" ? `Applica alle ${dove.utili.length} tracce scelte` : "Applica alla scheda aperta"),
+        el("button", { classe: "bottone leggero", type: "button", suclick: () => apriEditorModello(i) }, "Modifica…"),
+        el("button", { classe: "bottone leggero pericolo", type: "button", suclick: async () => {
+          const si = await chiedi({ titolo: "Eliminare il modello?", testo: `Il modello «${m.nome}» verrà eliminato da questo browser. I file audio non cambiano. Se l'hai esportato, potrai reimportarlo.`, si: "Elimina il modello", no: "Annulla", pericolo: true });
+          if (!si) return;
+          conservaModelli(modelli.filter((x) => x !== m));
+          disegnaElencoModelli();
+          if (!finestraModelli.open) finestraModelli.showModal();
+          disegnaScheda();
+        } }, icona("chiudi"), "Elimina…")))));
+  }
+  function apriModelli() {
+    disegnaElencoModelli();
+    if (!finestraModelli.open) finestraModelli.showModal();
+  }
+  $("#apri-modelli").addEventListener("click", apriModelli);
+  $("#modelli-nuovo").addEventListener("click", () => apriEditorModello(null, {}));
+  $("#modelli-esporta").addEventListener("click", () => {
+    if (!modelli.length) { avvisa("Non ci sono modelli da esportare."); return; }
+    const a = el("a", { href: URL.createObjectURL(new Blob([Modelli.esporta(modelli)], { type: "application/json" })), download: "tag-liatelle-modelli.json" });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    avvisa(`Ho esportato ${modelli.length} ${modelli.length === 1 ? "modello" : "modelli"} nel file «tag-liatelle-modelli.json» (tra i download).`, 7000);
+  });
+  $("#modelli-importa").addEventListener("click", () => {
+    const campo = el("input", { type: "file", accept: ".json,application/json" });
+    campo.addEventListener("change", async () => {
+      const f = campo.files[0];
+      if (!f) return;
+      if (f.size > 1024 * 1024) { avvisa("Il file è troppo grande per essere un file di modelli."); return; }
+      const r = Modelli.importa(await f.text(), modelli);
+      if (r.errore) { avvisa(r.errore, 8000); return; }
+      if (r.modelli.length) conservaModelli([...modelli, ...r.modelli]);
+      disegnaElencoModelli(r.rapporto);
+      disegnaScheda();
+    });
+    campo.click();
+  });
+
+  // ---------- editor di un modello ----------
+  const finestraEditor = $("#editor-modello");
+  /**
+   * @param {number|null} indice   il modello da modificare (null = nuovo)
+   * @param {object} iniziali      valori proposti per un modello nuovo
+   */
+  function apriEditorModello(indice, iniziali = {}) {
+    const esistente = indice === null ? null : modelli[indice];
+    $("#titolo-editor-modello").textContent = esistente ? `Modifica il modello «${esistente.nome}»` : "Nuovo modello di edizione";
+    const nome = $("#modello-nome");
+    nome.value = esistente ? esistente.nome : "";
+    const valori = esistente ? esistente.campi : iniziali;
+    const corpo = $("#modello-campi");
+    corpo.replaceChildren();
+    const righe = [];
+    for (const g of Campi.GRUPPI) {
+      const campi = g.campi.filter((c) => Modelli.CAMPI.includes(c));
+      if (!campi.length) continue;
+      corpo.append(el("h3", { testo: g.nome }));
+      for (const c of campi) {
+        const v = valori[c.id] == null ? "" : String(Array.isArray(valori[c.id]) ? "" : valori[c.id]);
+        const spunta = el("input", { type: "checkbox", "aria-label": `Metti «${c.etichetta}» nel modello` });
+        spunta.checked = esistente ? c.id in esistente.campi : !!v && Modelli.PREDEFINITI.has(c.id);
+        let input;
+        if (c.tipo === "si-no") {
+          input = el("select", { id: "modello-" + c.id }, el("option", { value: "", testo: "—" }), el("option", { value: "1", testo: "sì" }), el("option", { value: "0", testo: "no" }));
+          input.value = v === "" ? "" : /^(1|s[iì]|yes|true)$/i.test(v) ? "1" : "0";
+        } else if (c.tipo === "lungo") {
+          input = el("textarea", { id: "modello-" + c.id, rows: 2 });
+          input.value = v;
+        } else {
+          input = el("input", { id: "modello-" + c.id, value: v, autocomplete: "off", list: c.id === "lingua" ? "elenco-lingue" : null });
+        }
+        input.addEventListener(c.tipo === "si-no" ? "change" : "input", () => { spunta.checked = input.value.trim() !== ""; });
+        const riga = el("div", { classe: "riga-modello" }, spunta, el("label", { for: "modello-" + c.id, testo: c.etichetta }), input);
+        if (c.id === "licenza") riga.append(sceltaLicenza(null, "modello-"));
+        righe.push({ id: c.id, spunta, input });
+        corpo.append(riga);
+      }
+    }
+    const messaggio = $("#modello-messaggio");
+    messaggio.textContent = "";
+    $("#modello-salva").onclick = () => {
+      const campi = {};
+      for (const r of righe) if (r.spunta.checked) campi[r.id] = r.input.value;
+      const esito = Modelli.crea(nome.value, campi);
+      const doppio = esito.modello && modelli.some((m) => m !== esistente && m.nome.toLowerCase() === esito.modello.nome.toLowerCase());
+      if (!esito.modello || doppio) {
+        messaggio.textContent = doppio ? `C'è già un modello che si chiama «${esito.modello.nome}»: scegli un altro nome.` : esito.errori.join(" ");
+        messaggio.className = "messaggio-campo errore";
+        return;
+      }
+      conservaModelli(esistente ? modelli.map((m) => (m === esistente ? esito.modello : m)) : [...modelli, esito.modello]);
+      finestraEditor.close();
+      if (finestraModelli.open) disegnaElencoModelli();
+      disegnaScheda();
+      avvisa(`Modello «${esito.modello.nome}» salvato in questo browser.${esito.avvisi.length ? " Attenzione: " + esito.avvisi.join(" ") : ""}`, 7000);
+    };
+    finestraEditor.showModal();
+    nome.focus();
+  }
+
+  /** I valori che una scheda singola propone per un nuovo modello. */
+  const valoriTraccia = (t) => () => Campi.valoriFinali(t.lettura.campi, t.modifiche);
+  /** I valori che la scheda di gruppo propone: quelli comuni a tutte, più le modifiche di gruppo. */
+  const valoriGruppo = (utili) => () => {
+    const r = Gruppo.riassumi(utili.map((t) => t.lettura)).campi;
+    const v = {};
+    for (const [id, x] of Object.entries(r)) if (x.uguale && x.valore !== undefined) v[id] = x.valore;
+    for (const [id, x] of Object.entries(gruppo.modifiche)) if (id !== "copertina" && id !== "traccia") v[id] = x;
+    return v;
+  };
+
   async function apri(i) {
     if (i < 0 || i >= tracce.length) return;
     if (scelte.size && !(await nessunaScelta())) return;
@@ -1305,7 +1491,7 @@
         el("ul", {},
           el("li", { testo: "I file vengono letti e modificati qui, nel tuo browser: non vengono mai caricati su internet." }),
           el("li", { testo: "Non servono account né iscrizioni, e non c'è nessuna statistica sul tuo uso." }),
-          el("li", { testo: "Ricorda soltanto l'ultima cartella da cui hai aperto i file, per ripartire da lì: il ricordo resta in questo browser." }),
+          el("li", { testo: "Ricorda soltanto l'ultima cartella da cui hai aperto i file e i tuoi modelli di edizione: restano in questo browser, su questo computer." }),
           el("li", { testo: "Caratteri e programmi sono già dentro la pagina: funziona anche senza connessione." }),
           el("li", { testo: "Prima di scrivere in un file, Tag-liatelle ne fa una copia di sicurezza accanto all'originale." })
         )
