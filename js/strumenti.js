@@ -34,7 +34,7 @@
   // ------------------------------------------------------------------
   // parole che in un titolo restano minuscole (tranne la prima): italiano e inglese
   const MINORI = new Set((
-    "il lo la i gli le l un uno una di a da in con su per tra fra e ed o od ma né ne che " +
+    "il lo la i gli le l un uno una di d a da in con su per tra fra e ed o od ma né ne che " +
     "del dello della dei degli delle dell al allo alla ai agli alle all dal dallo dalla dai dagli dalle dall " +
     "nel nello nella nei negli nelle nell sul sullo sulla sui sugli sulle sull col coi " +
     "a an the and or nor but of in on at to for by with from as vs via"

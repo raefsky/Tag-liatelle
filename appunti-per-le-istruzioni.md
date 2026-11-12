@@ -109,3 +109,22 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
 - **Esporta in un file**: crea `tag-liatelle-modelli.json` tra i download. È un file di testo, si può tenere come copia o portare su un altro computer.
 - **Importa da un file**: aggiunge i modelli del file a quelli che hai. Un modello con un nome già usato viene importato con "(2)" nel nome, non sostituisce quello che c'è. I modelli con valori sbagliati vengono saltati e segnalati.
 - Eliminare un modello non cambia nessun file audio.
+
+## Strumenti (dalla versione 0.9.0)
+- Il pulsante **Strumenti** in alto lavora sulla traccia aperta, oppure su tutte le tracce scelte nella pila. La finestra dice sempre su quali.
+- **Spazi**: toglie gli spazi all'inizio e alla fine dei campi e riduce a uno quelli ripetuti. Nel testo del brano e nei commenti tiene gli a capo.
+- **Maiuscole**, in due modi:
+  - "Iniziali maiuscole": La Città di Notte. Articoli, preposizioni e congiunzioni restano minuscoli, in italiano e in inglese (il, di, dell', d', the, of…);
+  - "Solo la prima lettera": La città di notte. Il resto del titolo non cambia.
+
+  Si sceglie in quali campi (titolo, album…). Le sigle come DJ o RAI, i nomi come iPhone e i numeri romani restano come sono.
+- **Cerca e sostituisci**: in tutti i campi di testo o in uno solo, con le opzioni "distingui maiuscole e minuscole" e "solo parole intere". Il testo si cerca così com'è, senza simboli speciali.
+- Questi tre strumenti mostrano sempre l'anteprima "prima e dopo", file per file. Poi si salva come al solito, con copia di sicurezza e verifica.
+- **Rinomina i file**:
+  - si sceglie uno schema pronto oppure se ne scrive uno con i segnaposto {traccia}, {titolo}, {artista}, {album}, {anno}, {disco}, {artistaAlbum}, {genere};
+  - il numero di traccia prende lo zero davanti (01, 02…), e tre cifre se le tracce sono più di 99;
+  - i caratteri che i computer non accettano nei nomi (/ \ : * ? " < > |) diventano un trattino. L'estensione resta quella del file;
+  - l'anteprima mostra "nome di adesso → nome nuovo". I file a cui manca un dato, quelli che avrebbero lo stesso nome di un altro e quelli il cui nome nuovo è già usato nella cartella restano come sono, con il motivo;
+  - i nomi si costruiscono dai tag **già salvati** nei file;
+  - cambia solo il nome: il contenuto resta identico. Anche le copie di sicurezza prendono il nome nuovo;
+  - subito dopo, "Torna ai nomi di prima…" rimette i nomi vecchi, finché la pagina resta aperta.

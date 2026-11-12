@@ -14,6 +14,7 @@
   prova("maiuscole, iniziali: articoli e preposizioni restano minuscoli (italiano e inglese)", () => {
     uguale(S.maiuscole("la città di notte e il mare", "iniziali"), "La Città di Notte e il Mare", "italiano");
     uguale(S.maiuscole("dell'amore e dell'odio", "iniziali"), "Dell'Amore e dell'Odio", "apostrofi");
+    uguale(S.maiuscole("canzoni d'autunno — vol. 2", "iniziali"), "Canzoni d'Autunno — Vol. 2", "d' e il trattino lungo");
     uguale(S.maiuscole("the sound of the city", "iniziali"), "The Sound of the City", "inglese");
     uguale(S.maiuscole("TUTTO IN MAIUSCOLO? no: tutto minuscolo", "iniziali"), "TUTTO IN MAIUSCOLO? No: Tutto Minuscolo", "le sigle restano, dopo i due punti si ricomincia");
     uguale(S.maiuscole("live alla RAI con DJ mattarello e iPhone", "iniziali"), "Live alla RAI con DJ Mattarello e iPhone", "sigle e nomi con maiuscole interne");
