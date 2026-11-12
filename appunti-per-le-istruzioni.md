@@ -97,3 +97,15 @@ Cose da spiegare nelle istruzioni d'uso, raccolte durante il lavoro.
 - Un clic semplice su una traccia esce dal gruppo. Se ci sono modifiche di gruppo non salvate, prima chiede conferma.
 - Prima di scrivere, Tag-liatelle controlla che i tag del file siano ancora quelli letti all'apertura: se un altro programma li ha cambiati nel frattempo, si ferma e non sovrascrive il suo lavoro.
 - In Safari e Firefox la modifica a gruppi non c'è: lì si lavora una traccia alla volta e si scaricano le copie.
+
+## Modelli di edizione (dalla versione 0.8.0)
+- Un **modello** è un insieme di campi con un nome, per esempio "Edizioni del Mattarello" con etichetta, copyright, licenza e siti web. Si riapplica con un clic.
+- **Crearne uno**:
+  - dalla scheda di una traccia (o dalla scheda di gruppo), con "Salva come modello…": prende i valori già scritti e propone spuntati i campi tipici di un'etichetta;
+  - oppure dal pulsante **Modelli** in alto → "+ Nuovo modello".
+- Nell'editor spunti i campi che fanno parte del modello. C'è anche la scelta rapida delle licenze Creative Commons. Titolo, ISRC, testo, numero di traccia e disco non possono stare in un modello, perché sono propri di ogni brano.
+- **Applicarlo**: nella riga "Modello di edizione" in cima alla scheda scegli il modello e premi "Applica". Funziona su una traccia sola o su tutte le tracce scelte. Cambiano solo i campi del modello, e i file non vengono toccati finché non salvi, con la solita anteprima.
+- **Dove stanno**: i modelli restano in questo browser, su questo computer. Se cancelli i dati del browser li perdi: per questo conviene esportarli.
+- **Esporta in un file**: crea `tag-liatelle-modelli.json` tra i download. È un file di testo, si può tenere come copia o portare su un altro computer.
+- **Importa da un file**: aggiunge i modelli del file a quelli che hai. Un modello con un nome già usato viene importato con "(2)" nel nome, non sostituisce quello che c'è. I modelli con valori sbagliati vengono saltati e segnalati.
+- Eliminare un modello non cambia nessun file audio.

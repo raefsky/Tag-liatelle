@@ -579,3 +579,36 @@ input[type="radio"], input[type="checkbox"], input[type="range"] { accent-color:
 .file-anteprima .confronto { margin: 6px 0 4px; }
 .passi .stato-passo { color: var(--inchiostro-tenue); }
 .campo label.numera { text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--inchiostro); }
+
+/* ==========================================================================
+   Blocco 8: modelli di edizione
+   ========================================================================== */
+.riga-modelli {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  margin-top: 18px; padding: 8px 10px; border: 1.5px dashed var(--riga);
+}
+.riga-modelli .etichetta { font-size: 0.75rem; letter-spacing: .07em; text-transform: uppercase; color: var(--inchiostro-tenue); }
+.riga-modelli select {
+  font: 0.9rem var(--f-dati); color: var(--inchiostro); background: var(--cartellino);
+  border: 1.5px solid var(--inchiostro); border-radius: 2px; padding: 4px 6px; max-width: 100%;
+}
+.modello { border-top: 1.5px dashed var(--riga); padding: 10px 0 4px; }
+.modello h3 { font-size: 1.1rem; }
+.modello dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin: 6px 0; font-size: 0.9rem; }
+.modello dt { color: var(--inchiostro-tenue); }
+.modello dd { margin: 0; overflow-wrap: anywhere; }
+.rapporto-importazione { border-left: 4px solid var(--uovo); background: var(--uovo-tenue); padding: 6px 10px; margin-bottom: 10px; font-size: 0.9rem; }
+.rapporto-importazione ul { margin: 4px 0 0; padding-left: 1.2em; white-space: pre-wrap; }
+#editor-modello .campo { display: flex; flex-direction: column; margin: 0 0 6px; }
+.campi-modello { max-height: 55vh; overflow: auto; padding-right: 4px; }
+.campi-modello h3 { font-size: 1rem; margin: 12px 0 4px; }
+.riga-modello { display: grid; grid-template-columns: auto minmax(9em, 14em) 1fr; gap: 4px 10px; align-items: center; padding: 3px 0; border-bottom: 1px dotted var(--riga); }
+.riga-modello input[type="checkbox"] { width: 18px; height: 18px; }
+.riga-modello label { font-size: 0.85rem; }
+.riga-modello input:not([type]), .riga-modello textarea, .riga-modello select {
+  font: 0.95rem var(--f-dati); color: var(--inchiostro); background: transparent;
+  border: 0; border-bottom: 1.5px dotted var(--inchiostro-tenue); padding: 3px 2px; min-width: 0; width: 100%;
+}
+.riga-modello .licenza-rapida { grid-column: 2 / 4; font-size: 0.8rem; border: 1.5px dashed var(--inchiostro-tenue); padding: 4px; }
+#modello-nome { font: 1.05rem var(--f-dati); border: 0; border-bottom: 1.5px solid var(--inchiostro); background: transparent; color: var(--inchiostro); padding: 4px 2px; }
+@media (max-width: 600px) { .riga-modello { grid-template-columns: auto 1fr; } .riga-modello > :nth-child(3) { grid-column: 1 / 3; } }

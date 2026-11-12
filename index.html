@@ -37,6 +37,7 @@
     <symbol id="i-chiudi" viewBox="0 0 24 24"><path d="M6.2 6.2l11.6 11.6M17.8 6.2 6.2 17.8"/></symbol>
     <symbol id="i-timbro" viewBox="0 0 24 24"><path d="M9.6 3.6h4.8l-.8 6h4.6a1 1 0 0 1 1 .8l.8 3.8H4l.8-3.8a1 1 0 0 1 1-.8h4.6z"/><path d="M5 17.4h14M7 20.4h10"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.6"/><path d="M12 7.6v.1" stroke-width="2.4"/></symbol>
+    <symbol id="i-modello" viewBox="0 0 24 24"><path d="M8.6 3.6h10a1.4 1.4 0 0 1 1.4 1.4v10.4"/><path d="M5.4 7h10.2a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19.2V8.4A1.4 1.4 0 0 1 5.4 7z"/><path d="M7.4 11.4h6.2M7.4 14.6h6.2M7.4 17.8h3.6"/></symbol>
     <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3.6 11.2 12 4.4l8.4 6.8"/><path d="M5.8 9.6v9.8h12.4V9.6"/><path d="M10 19.4v-5.2h4v5.2"/></symbol>
     <symbol id="i-occhio-esempio" viewBox="0 0 24 24"><path d="M4.4 4.4h10.2l5 5V19.6H4.4z"/><path d="M8 10h6M8 13.4h8M8 16.8h5"/></symbol>
   </defs>
@@ -77,6 +78,9 @@
       <button type="button" data-tema="chiaro" aria-pressed="false" title="Tema chiaro"><svg class="icona" aria-hidden="true"><use href="#i-sole"/></svg><span class="solo-lettori">Chiaro</span></button>
       <button type="button" data-tema="scuro" aria-pressed="false" title="Tema scuro"><svg class="icona" aria-hidden="true"><use href="#i-luna"/></svg><span class="solo-lettori">Scuro</span></button>
     </div>
+    <button class="bottone leggero" id="apri-modelli" type="button" title="Modelli di edizione: insiemi di campi da riapplicare">
+      <svg class="icona" aria-hidden="true"><use href="#i-modello"/></svg><span class="testo-lungo">Modelli</span>
+    </button>
     <button class="bottone leggero" id="apri-info" type="button">
       <svg class="icona" aria-hidden="true"><use href="#i-info"/></svg><span class="testo-lungo">Come funziona</span>
     </button>
@@ -111,7 +115,7 @@
   <span>© Roberto Lanza · licenza <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.it" rel="license noopener" target="_blank">CC BY-NC-SA 4.0</a></span>
   <span>Tutto avviene sul tuo computer: nessun file viene caricato su internet.</span>
   <span>Funziona al completo in Chrome ed Edge.</span>
-  <span>versione <span id="versione">0.7.0</span></span>
+  <span>versione <span id="versione">0.8.0</span></span>
 </footer>
 
 <!-- Finestrella delle scorciatoie -->
@@ -180,6 +184,32 @@
   </p>
 </dialog>
 
+<!-- Modelli di edizione -->
+<dialog id="modelli" aria-labelledby="titolo-modelli" class="largo">
+  <h2 id="titolo-modelli">Modelli di edizione</h2>
+  <p class="nota-piccola">Un modello è un insieme di campi (etichetta, copyright, licenza, siti…) da riapplicare con un clic. I modelli restano in questo browser: esportali in un file per tenerne una copia o per portarli su un altro computer.</p>
+  <div id="elenco-modelli"></div>
+  <p class="bottoni-dialogo">
+    <button class="bottone leggero" type="button" id="modelli-importa">Importa da un file…</button>
+    <button class="bottone leggero" type="button" id="modelli-esporta">Esporta in un file</button>
+    <button class="bottone" type="button" id="modelli-nuovo">+ Nuovo modello</button>
+    <button class="bottone" type="button" onclick="this.closest('dialog').close()">Chiudi</button>
+  </p>
+</dialog>
+
+<!-- Editor di un modello -->
+<dialog id="editor-modello" aria-labelledby="titolo-editor-modello" class="largo">
+  <h2 id="titolo-editor-modello">Nuovo modello di edizione</h2>
+  <p class="campo"><label for="modello-nome">Nome del modello</label><input id="modello-nome" autocomplete="off" placeholder="per esempio: Edizioni del Mattarello"></p>
+  <p class="nota-piccola">Spunta i campi che fanno parte del modello. Quando lo applichi, cambiano solo questi; gli altri campi della traccia restano com'erano.</p>
+  <div id="modello-campi" class="campi-modello"></div>
+  <p id="modello-messaggio" class="messaggio-campo" aria-live="polite"></p>
+  <p class="bottoni-dialogo">
+    <button class="bottone" type="button" onclick="this.closest('dialog').close()">Annulla</button>
+    <button class="bottone principale" type="button" id="modello-salva">Salva il modello</button>
+  </p>
+</dialog>
+
 <!-- Conferma per le azioni delicate -->
 <dialog id="conferma" aria-labelledby="conferma-titolo">
   <h2 id="conferma-titolo"></h2>
@@ -209,6 +239,7 @@
 <script src="js/flac-scrittura.js"></script>
 <script src="js/formati.js"></script>
 <script src="js/gruppo.js"></script>
+<script src="js/modelli.js"></script>
 <script src="js/supporto.js"></script>
 <script src="js/apertura.js"></script>
 <script src="js/salvataggio.js"></script>
