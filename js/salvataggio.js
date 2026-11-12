@@ -133,6 +133,11 @@
     }
     const formato = Formati.per(traccia.formato);
     const lettura = await formato.leggi(Apertura.lettorePezzi(prima), prima.size);
+    // anche se data e dimensione sono uguali, i tag devono essere quelli letti all'apertura:
+    // se un altro programma li ha cambiati, scrivendo cancelleremmo il suo lavoro
+    if (traccia.lettura && impronteTag(lettura) !== impronteTag(traccia.lettura)) {
+      throw new ErroreChiaro("I tag del file sono stati cambiati da un altro programma dopo l'apertura. Per sicurezza non salvo: riaprilo e riprova.");
+    }
     const c = formato.controlla(lettura, opzioni);
     if (!c.ok) throw new ErroreChiaro(c.motivo);
     let nuovo;
@@ -189,6 +194,9 @@
     }
     return { file: dopo, lettura: riletto, copia: nomeCopia, note: nuovo.note, sulPosto: !!nuovo.sulPosto };
   }
+
+  /** Un riassunto dei tag letti: campi, personalizzati, immagini, posizione dell'audio. */
+  const impronteTag = (l) => JSON.stringify([ordina(l.campi), l.personalizzati, (l.immagini || []).map((i) => [i.tipo, i.mime, i.byte]), l.audio, l.altri]);
 
   function ordina(o) {
     const out = {};

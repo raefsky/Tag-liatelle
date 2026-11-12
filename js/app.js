@@ -136,7 +136,7 @@
 
   /** Aggiunge (o sostituisce) le tracce e le legge una alla volta. */
   async function aggiungi(nuove, { sostituisci = false } = {}) {
-    if (sostituisci) { tracce = []; corrente = -1; }
+    if (sostituisci) { tracce = []; corrente = -1; scelte.clear(); gruppo.modifiche = {}; }
     const gia = new Set(tracce.map(chiaveTraccia));
     const daLeggere = nuove.filter((t) => !gia.has(chiaveTraccia(t))).map((t) => ({ ...t, stato: "lettura", lettura: null }));
     const scartati = nuove.length - daLeggere.length;
@@ -213,7 +213,7 @@
     const files = Array.from(dt.files || []);
     const imm = files.find((f) => /^image\//.test(f.type));
     if (imm && !files.some((f) => /\.(mp3|flac)$/i.test(f.name))) {
-      const t = tracce[corrente];
+      const t = inGruppo() ? gruppo : tracce[corrente];
       if (t && document.querySelector('[data-trascina-immagine="si"]')) ritaglia(t, imm);
       else avvisa("Per cambiare la copertina, apri prima una scheda che si può modificare.");
       return;
@@ -223,6 +223,7 @@
 
   function chiudiTutto() {
     tracce = []; corrente = -1;
+    scelte.clear(); gruppo.modifiche = {};
     disegnaPila(); disegnaScheda();
     avvisa("Ho tolto le schede. I file sono rimasti come erano.");
   }
@@ -244,15 +245,30 @@
       return;
     }
     const lista = el("ol", { classe: "elenco", "aria-label": "Tracce aperte" });
+    if (tracce.length >= 2) {
+      contenitore.append(el("p", { classe: "comandi-pila" },
+        el("span", { testo: scelte.size ? `${scelte.size} ${scelte.size === 1 ? "scelta" : "scelte"}` : "Modifica a gruppi:" }),
+        el("button", { classe: "bottone leggero mini", type: "button", suclick: scegliTutte }, "scegli tutte"),
+        scelte.size ? el("button", { classe: "bottone leggero mini", type: "button", suclick: nessunaScelta }, "nessuna") : null));
+    }
     tracce.forEach((t, i) => {
       const c = (t.lettura && t.lettura.campi) || {};
       const sotto = t.stato === "errore" ? "non riesco a leggerlo"
         : t.stato === "lettura" ? "lettura…"
         : c.artista || "artista sconosciuto";
-      lista.append(el("li", {},
-        el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : "") + (quanteModifiche(t) ? " modificata" : ""), type: "button", "aria-current": i === corrente ? "true" : false, suclick: () => apri(i) },
+      const titolo = c.titolo || t.nome;
+      const spunta = el("input", { type: "checkbox", classe: "spunta", "aria-label": `Scegli «${titolo}» per la modifica a gruppi`, title: "Scegli per la modifica a gruppi" });
+      spunta.checked = scelte.has(t);
+      spunta.addEventListener("click", (e) => { e.preventDefault(); cambiaScelta(t, e); });
+      const clic = (e) => {
+        // ⌘/Ctrl + clic o Maiuscole + clic: si sceglie (come nel Finder); clic semplice: si apre la traccia
+        if (e.metaKey || e.ctrlKey || e.shiftKey) { e.preventDefault(); cambiaScelta(t, e); }
+        else apri(i);
+      };
+      lista.append(el("li", { classe: scelte.has(t) ? "scelta" : "" }, tracce.length >= 2 ? spunta : null,
+        el("button", { classe: "voce" + (t.stato === "errore" ? " problema" : "") + (quanteModifiche(t) ? " modificata" : ""), type: "button", "aria-current": !inGruppo() && i === corrente ? "true" : false, suclick: clic },
           el("span", { classe: "numero", testo: (c.traccia && c.traccia[0]) || "–" }),
-          el("span", { classe: "titolo", testo: c.titolo || t.nome }),
+          el("span", { classe: "titolo", testo: titolo }),
           el("span", { classe: "formato", testo: t.formato }),
           el("span", { classe: "artista", testo: sotto })
         )
@@ -271,6 +287,7 @@
     liberaImmagini();
     const c = $("#scheda-contenuto");
     c.replaceChildren();
+    if (inGruppo()) { disegnaSchedaGruppo(c); return; }
     const t = tracce[corrente];
     if (!t) {
       c.append(
@@ -894,8 +911,383 @@
     });
   }
 
-  function apri(i) {
+  // ==========================================================================
+  // MODIFICA A GRUPPI
+  // Si scelgono più tracce con le caselle della pila (oppure con ⌘/Ctrl e
+  // Maiuscole + clic). La scheda di gruppo mostra i campi comuni; quelli che
+  // cambiano da traccia a traccia appaiono come "valori diversi" e restano
+  // com'erano, a meno che non li cambi. Si scrive file per file, ognuno con
+  // la sua copia di sicurezza e la sua verifica.
+  // ==========================================================================
+  const scelte = new Set();          // le tracce scelte
+  let ancora = null;                 // l'ultima traccia cliccata (per Maiuscole + clic)
+  const gruppo = { modifiche: {} };  // le modifiche fatte sulla scheda di gruppo
+
+  const inGruppo = () => scelte.size >= 2;
+  /** Le tracce scelte, nell'ordine della pila (è anche l'ordine della numerazione). */
+  const tracceScelte = () => tracce.filter((t) => scelte.has(t));
+  /** Perché una traccia scelta non si può modificare in gruppo (null se si può). */
+  function escluso(t) {
+    if (t.stato !== "letto") return "non si legge";
+    const c = Formati.per(t.formato).controlla(t.lettura);
+    if (!c.ok) return "dati rovinati";
+    if (quanteModifiche(t)) return "ha modifiche sue non salvate";
+    return null;
+  }
+
+  function cambiaScelta(t, evento) {
+    const i = tracce.indexOf(t);
+    if (evento && evento.shiftKey && ancora && tracce.includes(ancora)) {
+      const [da, a] = [tracce.indexOf(ancora), i].sort((x, y) => x - y);
+      for (let k = da; k <= a; k++) scelte.add(tracce[k]);
+    } else if (scelte.has(t)) {
+      scelte.delete(t);
+    } else {
+      scelte.add(t);
+    }
+    ancora = t;
+    disegnaPila();
+    disegnaScheda();
+  }
+  function scegliTutte() { tracce.forEach((t) => scelte.add(t)); disegnaPila(); disegnaScheda(); }
+  async function nessunaScelta() {
+    if (Gruppo.quanteModifiche(gruppo.modifiche)) {
+      const si = await chiedi({ titolo: "Lasciare la modifica a gruppi?", testo: "Ci sono modifiche di gruppo non ancora salvate: se togli la scelta delle tracce, vanno perse. I file restano come sono.", si: "Lascia perdere le modifiche", no: "Resta nel gruppo" });
+      if (!si) return false;
+    }
+    scelte.clear();
+    gruppo.modifiche = {};
+    disegnaPila(); disegnaScheda();
+    return true;
+  }
+
+  // ---------- la scheda di gruppo ----------
+  function disegnaSchedaGruppo(c) {
+    const tutte = tracceScelte();
+    const utili = tutte.filter((t) => !escluso(t));
+    const fuori = tutte.filter((t) => escluso(t));
+    const formati = ["MP3", "FLAC"].map((f) => [f, utili.filter((t) => t.formato === f).length]).filter(([, n]) => n).map(([f, n]) => `${n} ${f}`).join(", ");
+    c.append(el("div", { classe: "scheda-testa" },
+      el("div", { classe: "chi" },
+        el("p", { classe: "inventario", testo: `Modifica a gruppi · ${formati || "nessuna traccia modificabile"}` }),
+        el("h2", { testo: `${utili.length} tracce insieme` }),
+        el("p", { classe: "nome-file", testo: "I campi uguali in tutte mostrano il loro valore. Dove c'è scritto «valori diversi», ogni traccia tiene il suo, a meno che tu non scriva qualcosa." }),
+        el("p", {}, el("button", { classe: "bottone leggero", type: "button", suclick: nessunaScelta }, icona("chiudi"), "Torna alla scheda singola"))
+      ),
+      utili.length >= 1 ? fotoGruppo(utili) : null));
+    if (fuori.length) {
+      c.append(riquadroAvvisi([`Queste tracce sono scelte ma non verranno toccate: ${fuori.map((t) => `«${(t.lettura && t.lettura.campi.titolo) || t.nome}» (${escluso(t)})`).join(", ")}.`]));
+    }
+    if (utili.some((t) => !t.maniglia)) {
+      c.append(riquadroAvvisi(["In questo browser i file non si possono salvare direttamente, quindi la modifica a gruppi non è disponibile: modifica una traccia alla volta e scarica le copie."]));
+      return;
+    }
+    if (utili.length < 2) { c.append(el("p", { classe: "nota-esempio", testo: "Per la modifica a gruppi servono almeno due tracce modificabili." })); return; }
+
+    const riassunto = Gruppo.riassumi(utili.map((t) => t.lettura));
+    for (const g of Campi.GRUPPI) {
+      const griglia = el("div", { classe: "campi" }, g.campi.map((campo) => disegnaCampoGruppo(campo, riassunto.campi[campo.id], utili)));
+      if (g.id === "extra") griglia.append(el("p", { classe: "campo largo nota-piccola", testo: "I campi personalizzati si modificano una traccia alla volta." }));
+      if (g.sempreAperto) {
+        c.append(el("div", { classe: "gruppo" }, el("h3", { testo: g.nome }), griglia));
+      } else {
+        const conModifiche = g.campi.some((campo) => campo.id in gruppo.modifiche);
+        const d = el("details", { classe: "gruppo", "data-gruppo": g.id, open: gruppiAperti.has(g.id) || conModifiche },
+          el("summary", {}, g.nome, " ", el("small", { testo: "· " + g.nota })), griglia);
+        d.addEventListener("toggle", () => { if (d.open) gruppiAperti.add(g.id); else gruppiAperti.delete(g.id); });
+        c.append(d);
+      }
+    }
+    c.append(barraSalvaGruppo(utili));
+    c.append(el("div", { classe: "timbro", id: "timbro", hidden: true, "aria-hidden": "true" }, "Salvate", el("small", { id: "timbro-data" })));
+  }
+
+  /** Un campo della scheda di gruppo. */
+  function disegnaCampoGruppo(campo, r, utili) {
+    const id = "campo-" + campo.id;
+    const classi = "campo" + ({ largo: " largo", stretto: " stretto", quarto: " quarto" }[campo.larghezza] || "");
+    const box = el("div", { classe: classi });
+    const messaggio = el("p", { classe: "messaggio-campo", id: id + "-msg", "aria-live": "polite" });
+    const formato = utili.some((t) => t.formato === "MP3") ? "MP3" : "FLAC";
+    const aggiorna = () => {
+      const cambiato = campo.id in gruppo.modifiche;
+      box.classList.toggle("cambiato", cambiato);
+      const v = gruppo.modifiche[campo.id];
+      const esito = cambiato && campo.id !== "traccia" ? Campi.controllaValore(campo.id, v, formato) : {};
+      messaggio.textContent = esito.errore || esito.avviso || "";
+      messaggio.className = "messaggio-campo" + (esito.errore ? " errore" : esito.avviso ? " dubbio" : "");
+      aggiornaBarraGruppo();
+    };
+    const imposta = (valore, comune) => {
+      // se si torna al valore comune di prima, non è più una modifica
+      if (comune !== undefined && JSON.stringify(normale(valore)) === JSON.stringify(normale(comune))) delete gruppo.modifiche[campo.id];
+      else gruppo.modifiche[campo.id] = valore;
+      aggiorna();
+    };
+    const diversi = !r.uguale;
+    const segnoDiversi = `valori diversi (${r.valori})`;
+    const comune = r.uguale ? r.valore : undefined;
+
+    // campi propri di ogni brano: qui si leggono soltanto
+    if (Gruppo.SOLO_SINGOLI.has(campo.id)) {
+      box.append(el("label", { for: id, testo: campo.etichetta }),
+        el("input", { id, readonly: true, value: diversi ? "" : comune || "", placeholder: diversi ? "diverso per ogni brano" : "" }),
+        el("p", { classe: "messaggio-campo dubbio-neutro", testo: "Si modifica una traccia alla volta." }));
+      return box;
+    }
+
+    // numero di traccia: numerazione automatica e totale
+    if (campo.id === "traccia") {
+      const m = gruppo.modifiche.traccia || { numera: null, totale: null };
+      const salva = () => {
+        const numera = spunta.checked ? { partenza: Math.max(1, parseInt(partenza.value, 10) || 1) } : null;
+        const totaleNuovo = totale.value.trim() === "" && !diversi && !comune ? null : totale.value.trim();
+        const cambiaTotale = totaleNuovo !== null && totaleNuovo !== (comune || "") && !(diversi && totaleNuovo === "");
+        if (!numera && !cambiaTotale) delete gruppo.modifiche.traccia;
+        else gruppo.modifiche.traccia = { numera, totale: cambiaTotale ? totaleNuovo : null };
+        aggiorna();
+        if (totale.value.trim() && !/^\d+$/.test(totale.value.trim())) { messaggio.textContent = "Il totale deve essere un numero, per esempio 12."; messaggio.className = "messaggio-campo errore"; }
+      };
+      const spunta = el("input", { type: "checkbox", id: id + "-numera" });
+      spunta.checked = !!m.numera;
+      const partenza = el("input", { value: m.numera ? m.numera.partenza : 1, inputmode: "numeric", "aria-label": "Numero da cui partire", classe: "partenza" });
+      const totale = el("input", { id, value: m.totale !== null && m.totale !== undefined ? m.totale : comune || "", inputmode: "numeric", placeholder: diversi ? "diversi" : "", "aria-label": "Totale delle tracce" });
+      for (const x of [spunta, partenza, totale]) x.addEventListener(x === spunta ? "change" : "input", salva);
+      const usaTotale = el("button", { classe: "bottone leggero mini", type: "button", suclick: () => { totale.value = Gruppo.totaleNumerazione(utili); salva(); } }, `usa ${utili.length}`);
+      box.classList.add("largo-gruppo");
+      box.append(el("span", { classe: "etichetta", testo: "Traccia" }),
+        el("label", { classe: "numera" }, spunta, " Numera in ordine, partendo da ", partenza),
+        el("span", { classe: "coppia" }, el("span", { testo: "totale" }), totale, usaTotale),
+        messaggio);
+      aggiorna();
+      return box;
+    }
+
+    // disco: numero e totale come un campo normale
+    if (campo.tipo === "numero-di") {
+      const v = campo.id in gruppo.modifiche ? gruppo.modifiche[campo.id] : comune || ["", ""];
+      const a = el("input", { id, value: v[0] || "", inputmode: "numeric", placeholder: diversi ? "diversi" : "", "aria-label": campo.etichetta + ", numero" });
+      const b = el("input", { value: v[1] || "", inputmode: "numeric", placeholder: diversi ? "diversi" : "", "aria-label": campo.etichetta + ", totale" });
+      const salva = () => {
+        if (diversi && !a.value.trim() && !b.value.trim()) { delete gruppo.modifiche[campo.id]; aggiorna(); return; }
+        imposta([a.value, b.value], comune || ["", ""]);
+      };
+      a.addEventListener("input", salva); b.addEventListener("input", salva);
+      box.append(el("span", { classe: "etichetta", testo: campo.etichetta }), el("span", { classe: "coppia" }, a, el("span", { testo: "di" }), b), messaggio);
+      aggiorna();
+      return box;
+    }
+
+    // sì / no
+    if (campo.tipo === "si-no") {
+      const leggi = (v) => (vuoto(v) ? "" : /^(1|s[iì]|yes|true)$/i.test(String(v).trim()) ? "1" : "0");
+      const sel = el("select", { id },
+        diversi ? el("option", { value: "__", testo: `— ${segnoDiversi} —` }) : null,
+        el("option", { value: "", testo: "—" }), el("option", { value: "1", testo: "sì" }), el("option", { value: "0", testo: "no" }));
+      sel.value = campo.id in gruppo.modifiche ? gruppo.modifiche[campo.id] : diversi ? "__" : leggi(comune);
+      sel.addEventListener("change", () => {
+        if (sel.value === "__") { delete gruppo.modifiche[campo.id]; aggiorna(); return; }
+        imposta(sel.value, diversi ? undefined : leggi(comune));
+      });
+      box.append(el("label", { for: id, testo: campo.etichetta }), sel, messaggio);
+      aggiorna();
+      return box;
+    }
+
+    // testo
+    const valore = campo.id in gruppo.modifiche ? gruppo.modifiche[campo.id] : diversi ? "" : comune || "";
+    const svuota = campo.id in gruppo.modifiche && gruppo.modifiche[campo.id] === "" && diversi;
+    const input = campo.tipo === "lungo" ? el("textarea", { id, rows: 3 }) : el("input", { id, autocomplete: "off", list: campo.id === "lingua" ? "elenco-lingue" : null });
+    input.value = valore;
+    input.placeholder = svuota ? "verrà svuotato in tutte" : diversi ? `${segnoDiversi}: scrivi per mettere lo stesso in tutte` : "";
+    input.addEventListener("input", () => {
+      if (diversi && input.value === "") { delete gruppo.modifiche[campo.id]; input.placeholder = `${segnoDiversi}: scrivi per mettere lo stesso in tutte`; aggiorna(); return; }
+      imposta(input.value, comune);
+    });
+    box.append(el("label", { for: id, testo: campo.etichetta }), input, messaggio);
+    if (diversi) {
+      box.classList.add("diversi");
+      box.append(el("button", { classe: "bottone leggero mini", type: "button", title: "Toglie questo campo da tutte le tracce scelte",
+        suclick: () => { input.value = ""; gruppo.modifiche[campo.id] = ""; input.placeholder = "verrà svuotato in tutte"; aggiorna(); } }, "svuota in tutte"));
+    }
+    if (campo.id === "licenza") box.append(sceltaLicenza(null));
+    aggiorna();
+    return box;
+  }
+
+  /** La copertina della scheda di gruppo. */
+  function fotoGruppo(utili) {
+    const r = Gruppo.riassumi(utili.map((t) => t.lettura)).copertina;
+    const modifica = gruppo.modifiche.copertina;
+    let foto, didascalia;
+    if (modifica && modifica.azione === "sostituisci") {
+      foto = el("div", { classe: "foto" }, immagine(modifica.dati, modifica.mime, "Nuova copertina per tutte"));
+      didascalia = `Nuova copertina per tutte · ${modifica.lato} × ${modifica.lato} px · ${nomeFormatoImmagine(modifica.mime)} · ${misura(modifica.byte)} · da salvare`;
+    } else if (modifica) {
+      foto = el("div", { classe: "foto tolta" }, el("span", { testo: "verrà tolta" }));
+      didascalia = "La copertina verrà tolta da tutte.";
+    } else if (r.uguale && r.immagine) {
+      foto = el("div", { classe: "foto" }, immagine(r.immagine.dati, r.immagine.mime, "Copertina comune"));
+      didascalia = "La stessa copertina in tutte";
+    } else {
+      foto = el("div", { classe: "foto", role: "img", "aria-label": "Copertine diverse" }, el("span", { testo: r.uguale ? "nessuna copertina" : "copertine diverse" }));
+      didascalia = r.uguale ? "Nessuna traccia ha la copertina" : `${r.quante} tracce su ${utili.length} hanno una copertina, non tutte uguali`;
+    }
+    return el("figure", { classe: "copertina" + (modifica ? " cambiata" : ""), "data-trascina-immagine": "si" },
+      foto, el("figcaption", { testo: didascalia }),
+      el("div", { classe: "comandi-foto" },
+        el("button", { classe: "bottone leggero", type: "button", suclick: () => scegliImmagine(gruppo) }, "Stessa copertina per tutte…"),
+        r.quante && !modifica ? el("button", { classe: "bottone leggero pericolo", type: "button", suclick: () => impostaCopertina(gruppo, { azione: "rimuovi" }) }, "Rimuovi da tutte") : null,
+        modifica ? el("button", { classe: "bottone leggero", type: "button", suclick: () => impostaCopertina(gruppo, null) }, "Tieni quelle di prima") : null));
+  }
+
+  // ---------- barra, anteprima e salvataggio del gruppo ----------
+  function barraSalvaGruppo() {
+    const barra = el("div", { classe: "barra-salva", id: "barra-salva" },
+      el("span", { classe: "barra-testo" }),
+      el("span", { classe: "barra-bottoni" },
+        el("button", { classe: "bottone leggero", type: "button", id: "bottone-annulla", suclick: () => { gruppo.modifiche = {}; disegnaScheda(); avvisa("Modifiche di gruppo annullate."); } }, "Annulla le modifiche"),
+        el("button", { classe: "bottone principale", type: "button", id: "bottone-salva", suclick: apriAnteprimaGruppo }, icona("timbro"), "Salva nelle tracce…")));
+    setTimeout(aggiornaBarraGruppo);
+    return barra;
+  }
+  function aggiornaBarraGruppo() {
+    const testo = document.querySelector(".barra-testo");
+    if (!testo || !inGruppo()) return;
+    const n = Gruppo.quanteModifiche(gruppo.modifiche);
+    testo.textContent = n ? `${n} ${n === 1 ? "modifica" : "modifiche"} per ${tracceScelte().filter((t) => !escluso(t)).length} tracce, non ancora ${n === 1 ? "salvata" : "salvate"}` : "Nessuna modifica";
+    $("#bottone-salva").disabled = !n;
+    $("#bottone-annulla").disabled = !n;
+    $("#barra-salva").classList.toggle("attiva", n > 0);
+  }
+
+  let pianoGruppo = null; // ciò che l'anteprima ha mostrato: si scrive esattamente quello
+
+  function apriAnteprimaGruppo() {
+    if (!Gruppo.quanteModifiche(gruppo.modifiche) || salvataggioInCorso) return;
+    const utili = tracceScelte().filter((t) => !escluso(t));
+    // controlli dei valori (sono gli stessi per tutte le tracce)
+    for (const [k, v] of Object.entries(gruppo.modifiche)) {
+      if (k === "copertina") continue;
+      const etichetta = (Campi.TUTTI.find((c) => c.id === k) || {}).etichetta || k;
+      if (k === "traccia") {
+        if (v.totale && !/^\d+$/.test(v.totale)) { avvisa("Traccia: il totale deve essere un numero.", 8000); mostraCampo("traccia"); return; }
+        continue;
+      }
+      const formati = new Set(utili.map((t) => t.formato));
+      for (const f of formati) {
+        const esito = Campi.controllaValore(k, v, f);
+        if (esito.errore) { avvisa(`${etichetta}: ${esito.errore}`, 10000); mostraCampo(k); return; }
+      }
+    }
+    const modificheComuni = {};
+    for (const [k, v] of Object.entries(gruppo.modifiche)) modificheComuni[k] = k === "copertina" || k === "traccia" ? v : Campi.normalizza(k, v);
+    const perTraccia = Gruppo.perTraccia(modificheComuni, utili.map((t) => t.lettura));
+    const piano = [];
+    const giaAPosto = [];
+    for (let i = 0; i < utili.length; i++) {
+      const t = utili[i], m = perTraccia[i];
+      if (!Object.keys(m).length) { giaAPosto.push(t); continue; }
+      try { Formati.per(t.formato).prepara(t.lettura, m); }
+      catch (e) { avvisa(`«${t.nome}»: ${(e && e.message) || e} Nessun file è stato toccato.`, 10000); return; }
+      piano.push({ t, m });
+    }
+    if (!piano.length) { avvisa("Tutte le tracce scelte hanno già questi valori: non c'è niente da scrivere."); return; }
+    pianoGruppo = piano;
+
+    const corpo = $("#anteprima-corpo");
+    corpo.replaceChildren();
+    const leggibile = (k, v) => (k === "compilation" && !vuoto(v) ? (/^(1|s[iì]|yes|true)$/i.test(String(v).trim()) ? "sì" : "no") : mostraValore(v));
+    const tabella = ({ t, m }) => el("table", { classe: "confronto" },
+      el("thead", {}, el("tr", {}, el("th", { scope: "col", testo: "Campo" }), el("th", { scope: "col", testo: "Prima" }), el("th", { scope: "col", testo: "Dopo" }))),
+      el("tbody", {}, Object.keys(m).map((k) => {
+        if (k === "copertina") {
+          const f = t.lettura.immagini.find((x) => x.tipo === 3);
+          return el("tr", {}, el("th", { scope: "row", testo: "Copertina" }),
+            el("td", { testo: f ? `${nomeFormatoImmagine(f.mime)}, ${misura(f.byte)}` : "(nessuna)" }),
+            el("td", { classe: "dopo", testo: m.copertina.azione === "rimuovi" ? "(tolta)" : `${nomeFormatoImmagine(m.copertina.mime)} ${m.copertina.lato} × ${m.copertina.lato} px` }));
+        }
+        const campo = Campi.TUTTI.find((c) => c.id === k);
+        const prima = leggibile(k, t.lettura.campi[k]), dopo = leggibile(k, normale(m[k]));
+        return el("tr", {}, el("th", { scope: "row", testo: campo ? campo.etichetta : k }),
+          el("td", { classe: prima ? "" : "vuoto-cella", testo: prima || "(vuoto)" }),
+          el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolto)" }));
+      })));
+    corpo.append(
+      el("p", { testo: `Cambieranno ${piano.length} file${giaAPosto.length ? `; ${giaAPosto.length} ${giaAPosto.length === 1 ? "ha" : "hanno"} già questi valori e non ${giaAPosto.length === 1 ? "verrà toccato" : "verranno toccati"}` : ""}.` }),
+      el("div", { classe: "elenco-file" }, piano.map((p, i) => el("details", { classe: "file-anteprima", open: piano.length <= 3 || i === 0 },
+        el("summary", {}, el("b", { testo: (p.t.lettura.campi.titolo || p.t.nome) }), ` · ${p.t.formato} · ${Object.keys(p.m).length} ${Object.keys(p.m).length === 1 ? "campo" : "campi"}`),
+        el("p", { classe: "nome-file", testo: p.t.percorso }),
+        tabella(p)))),
+      el("ul", { classe: "note-salvataggio" },
+        el("li", { testo: `Prima di scrivere in ogni file ne faccio una copia di sicurezza nella cartella «${Salvataggio.COPIE}», accanto al file.` }),
+        el("li", { testo: "Scrivo un file alla volta e controllo ogni volta che l'audio sia identico, byte per byte." }),
+        el("li", { testo: "Se un file dà un problema mi fermo: quelli già salvati restano salvati, gli altri restano come sono." }),
+        piano.some((p) => !p.t.radice && !p.t.accesso) ? el("li", { testo: "Per i file aperti uno per uno, il browser può chiederti di confermare la cartella che li contiene." }) : null),
+      el("ol", { classe: "passi", id: "passi", hidden: true }));
+    $("#anteprima-conferma").textContent = `Scrivi in ${piano.length} file`;
+    $("#anteprima-conferma").disabled = false;
+    $("#anteprima-annulla").disabled = false;
+    $("#anteprima-annulla").textContent = "Annulla";
+    $("#anteprima-conferma").onclick = eseguiGruppo;
+    finestraAnteprima.showModal();
+  }
+
+  async function eseguiGruppo() {
+    const piano = pianoGruppo;
+    if (!piano) return;
+    salvataggioInCorso = true;
+    $("#anteprima-conferma").disabled = true;
+    $("#anteprima-annulla").disabled = true;
+    const passi = $("#passi");
+    passi.hidden = false;
+    passi.replaceChildren();
+    document.querySelectorAll(".file-anteprima").forEach((d) => { d.open = false; });
+    let salvati = 0;
+    try {
+      // prima i permessi, tutti insieme, finché il browser considera valido il clic
+      for (const { t } of piano) await Salvataggio.accesso(t);
+      for (let i = 0; i < piano.length; i++) {
+        const { t, m } = piano[i];
+        const riga = el("li", { testo: `${i + 1} di ${piano.length} · ${t.nome}` });
+        const stato = el("span", { classe: "stato-passo" });
+        riga.append(" ", stato);
+        passi.append(riga);
+        riga.scrollIntoView({ block: "nearest" });
+        const esito = await Salvataggio.salva(t, m, (nome) => { stato.textContent = "· " + (NOMI_PASSI[nome] || nome).toLowerCase() + "…"; });
+        t.file = esito.file; t.lettura = esito.lettura; t.modifiche = {};
+        riga.classList.add("fatto");
+        stato.textContent = "· salvato" + (esito.sulPosto ? " (audio fermo)" : "");
+        salvati++;
+      }
+      gruppo.modifiche = {};
+      pianoGruppo = null;
+      finestraAnteprima.close();
+      ordina(); disegnaPila(); disegnaScheda();
+      imprimiTimbro();
+      avvisa(`Fatto: ${salvati} file salvati, ognuno con la sua copia di sicurezza.`, 7000);
+    } catch (e) {
+      console.error(e);
+      const ultima = passi.lastElementChild;
+      if (ultima && !ultima.classList.contains("fatto")) ultima.classList.add("fallito");
+      const testo = e instanceof Salvataggio.ErroreChiaro ? e.message
+        : e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? "Il browser non ha dato il permesso di modificare i file (a volte lo chiede una cartella alla volta: premi di nuovo «Salva nelle tracce»)."
+        : `${(e && e.name) || "errore"}: ${(e && e.message) || e}`;
+      passi.append(el("li", { classe: "errore-passo", testo: `Mi sono fermato. ${salvati ? `${salvati} file ${salvati === 1 ? "è stato salvato" : "sono stati salvati"}; ` : ""}gli altri sono rimasti come erano. Motivo: ${testo}` }));
+      $("#anteprima-annulla").disabled = false;
+      $("#anteprima-annulla").textContent = "Chiudi";
+      // le modifiche di gruppo restano: riprovando, le tracce già salvate risultano "già a posto"
+      disegnaPila();
+      finestraAnteprima.addEventListener("close", () => disegnaScheda(), { once: true });
+    } finally {
+      salvataggioInCorso = false;
+    }
+  }
+
+  async function apri(i) {
     if (i < 0 || i >= tracce.length) return;
+    if (scelte.size && !(await nessunaScelta())) return;
+    ancora = tracce[i];
     corrente = i;
     disegnaPila(); disegnaScheda();
     const voce = document.querySelector('.voce[aria-current="true"]');
@@ -990,6 +1382,7 @@
     const inCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.readOnly;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
+      if (inGruppo()) { if (!finestraAnteprima.open) { if (Gruppo.quanteModifiche(gruppo.modifiche)) apriAnteprimaGruppo(); else avvisa("Non ci sono modifiche da salvare."); } return; }
       const t = tracce[corrente];
       if (!t || !quanteModifiche(t)) avvisa("Non ci sono modifiche da salvare.");
       else if (!finestraAnteprima.open) apriAnteprima(t);
@@ -1009,9 +1402,9 @@
   disegnaScheda();
 
   window.addEventListener("beforeunload", (e) => {
-    if (tracce.some((t) => quanteModifiche(t)) || salvataggioInCorso) { e.preventDefault(); e.returnValue = ""; }
+    if (tracce.some((t) => quanteModifiche(t)) || Gruppo.quanteModifiche(gruppo.modifiche) || salvataggioInCorso) { e.preventDefault(); e.returnValue = ""; }
   });
 
   // per le prove automatiche: permette di aprire file senza le finestre di scelta
-  window.TagLiatelle = { aggiungi, tracce: () => tracce };
+  window.TagLiatelle = { aggiungi, tracce: () => tracce, scelte: () => scelte, gruppo: () => gruppo };
 })();

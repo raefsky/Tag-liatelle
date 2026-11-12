@@ -551,3 +551,31 @@ input[type="radio"], input[type="checkbox"], input[type="range"] { accent-color:
 .personalizzati.cambiato > .etichetta::after { content: " · modificato"; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--inchiostro-tenue); }
 .confronto td.a-capo { white-space: pre-line; }
 @media (max-width: 520px) { .riga-personalizzato { grid-template-columns: 1fr auto; } .riga-personalizzato > span { display: none; } .riga-personalizzato input:nth-of-type(2) { grid-column: 1; } }
+
+/* ==========================================================================
+   Blocco 7: modifica a gruppi
+   ========================================================================== */
+.comandi-pila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 0; font-size: 0.85rem; color: var(--inchiostro-tenue); }
+.bottone.mini { padding: 3px 8px; font-size: 0.78rem; box-shadow: none; }
+.elenco li { display: grid; grid-template-columns: auto 1fr; align-items: stretch; }
+.elenco li:not(:has(.spunta)) { grid-template-columns: 1fr; }
+.elenco .spunta { margin: 0 6px 0 0; align-self: center; width: 18px; height: 18px; cursor: pointer; }
+.elenco li.scelta .voce { background: var(--uovo-tenue); box-shadow: inset 6px 0 0 var(--inchiostro); padding-left: 12px; }
+
+/* scheda di gruppo */
+.campo.diversi input::placeholder, .campo.diversi textarea::placeholder { font-style: italic; color: var(--inchiostro-tenue); opacity: 1; }
+.campo .bottone.mini { align-self: flex-start; margin-top: 4px; }
+.campo.largo-gruppo { grid-column: span 6; }
+.campo .numera { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; font-size: 0.9rem; }
+.campo .numera input.partenza { width: 4ch; text-align: center; }
+.campo .numera input[type="checkbox"] { width: 18px; height: 18px; }
+.messaggio-campo.dubbio-neutro { color: var(--inchiostro-tenue); font-style: italic; }
+@media (max-width: 860px) { .campo.largo-gruppo { grid-column: span 12; } }
+
+/* anteprima di più file */
+.elenco-file { display: grid; gap: 6px; margin: 10px 0 12px; max-height: 50vh; overflow: auto; }
+.file-anteprima { border: 1.5px dotted var(--riga); padding: 6px 10px; }
+.file-anteprima summary { cursor: pointer; }
+.file-anteprima .confronto { margin: 6px 0 4px; }
+.passi .stato-passo { color: var(--inchiostro-tenue); }
+.campo label.numera { text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--inchiostro); }
