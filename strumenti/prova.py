@@ -212,7 +212,11 @@ def main():
     print("1) Prove nel browser (test/index.html)")
     esito, letture, scritti = esegui_nel_browser()
     if not esito:
-        sys.exit("   Non sono riuscito a leggere il risultato delle prove.")
+        # a volte Edge impiega troppo ad avviarsi: si riprova una volta
+        print("   Il browser non ha risposto: riprovo una volta…")
+        esito, letture, scritti = esegui_nel_browser()
+    if not esito:
+        sys.exit("   Non sono riuscito a leggere il risultato delle prove (il browser non ha risposto due volte).")
     for f in esito["fallite"]:
         print(f"   ✗ {f['nome']}\n     {f['errore']}")
     print(f"   {esito['superate']} superate su {esito['totale']}")
