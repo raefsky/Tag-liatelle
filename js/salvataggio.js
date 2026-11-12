@@ -278,6 +278,97 @@
   }
 
   // ------------------------------------------------------------------
+  // Rinomina
+  // Il contenuto del file non cambia: cambia solo il nome. Se il browser sa
+  // rinominare (move), si usa quello; altrimenti si crea il file con il nome
+  // nuovo, si controlla che sia identico byte per byte e solo allora si
+  // toglie quello vecchio. Anche le copie di sicurezza seguono il nuovo nome.
+  // ------------------------------------------------------------------
+  /** I nomi dei file nella cartella della traccia, se si possono leggere senza chiedere permessi (altrimenti null). */
+  async function nomiInCartella(traccia) {
+    try {
+      let cartella = traccia.accesso && traccia.accesso.cartella;
+      if (!cartella && traccia.radice && (await traccia.radice.queryPermission({ mode: "read" })) === "granted") {
+        cartella = traccia.radice;
+        for (const nome of traccia.dentro || []) cartella = await cartella.getDirectoryHandle(nome);
+      }
+      if (!cartella) return null;
+      const nomi = [];
+      for await (const [nome, voce] of cartella.entries()) if (voce.kind === "file") nomi.push(nome);
+      return nomi;
+    } catch (e) { return null; }
+  }
+
+  async function sposta(cartella, maniglia, vecchio, nuovo) {
+    const soloMaiuscole = vecchio.toLowerCase() === nuovo.toLowerCase();
+    if (!soloMaiuscole && (await esiste(cartella, nuovo))) {
+      throw new ErroreChiaro(`Nella cartella c'è già un file che si chiama «${nuovo}»: non lo sovrascrivo.`);
+    }
+    if (typeof maniglia.move === "function") {
+      try {
+        if (soloMaiuscole) {
+          // il Mac non distingue "a.mp3" da "A.mp3": si passa da un nome provvisorio
+          const provvisorio = `.tagliatelle-${Date.now()}-${nuovo}`;
+          await maniglia.move(provvisorio);
+          await maniglia.move(nuovo);
+        } else {
+          await maniglia.move(nuovo);
+        }
+        return await cartella.getFileHandle(nuovo);
+      } catch (e) {
+        if (!(e && (e.name === "NotSupportedError" || e.name === "TypeError"))) throw e;
+        // il browser dichiara "move" ma non lo sa fare qui: si prosegue con la copia
+      }
+    }
+    if (soloMaiuscole) throw new ErroreChiaro("Questo browser non sa cambiare solo le maiuscole del nome di un file.");
+    const prima = await maniglia.getFile();
+    const improntaPrima = await impronta(prima);
+    const nuova = await cartella.getFileHandle(nuovo, { create: true });
+    try {
+      await scriviFile(nuova, prima);
+      const dopo = await nuova.getFile();
+      if (dopo.size !== prima.size || (await impronta(dopo)) !== improntaPrima) throw new ErroreChiaro("La copia con il nome nuovo non è venuta identica.");
+    } catch (e) {
+      try { await cartella.removeEntry(nuovo); } catch (e2) { /* niente da togliere */ }
+      throw e instanceof ErroreChiaro ? e : new ErroreChiaro("Non sono riuscito a creare il file con il nome nuovo. Il file è rimasto com'era.");
+    }
+    await cartella.removeEntry(vecchio);
+    return nuova;
+  }
+
+  /**
+   * Rinomina il file di una traccia (e le sue copie di sicurezza).
+   * Aggiorna nome, percorso, maniglia e file della traccia.
+   */
+  async function rinomina(traccia, nuovo) {
+    const { cartella, maniglia } = await accesso(traccia);
+    const vecchio = traccia.nome;
+    if (vecchio === nuovo) return traccia;
+    const prima = await maniglia.getFile();
+    if (traccia.file && (prima.size !== traccia.file.size || prima.lastModified !== traccia.file.lastModified)) {
+      throw new ErroreChiaro(`Il file «${vecchio}» è stato cambiato da un altro programma dopo l'apertura: riaprilo prima di rinominarlo.`);
+    }
+    const nuovaManiglia = await sposta(cartella, maniglia, vecchio, nuovo);
+    // le copie di sicurezza seguono il file (se un nome è già preso, quella copia resta col vecchio nome)
+    try {
+      const copie = await cartella.getDirectoryHandle(COPIE);
+      const nv = nomiCopie(vecchio), nn = nomiCopie(nuovo);
+      for (const quale of ["originale", "ultima"]) {
+        const m = await esiste(copie, nv[quale]);
+        if (m && !(await esiste(copie, nn[quale]))) await sposta(copie, m, nv[quale], nn[quale]);
+      }
+    } catch (e) { /* nessuna copia: va bene così */ }
+    const file = await nuovaManiglia.getFile();
+    if (file.size !== prima.size) throw new ErroreChiaro(`Dopo la rinomina «${nuovo}» non ha la dimensione giusta: controllalo.`);
+    traccia.nome = nuovo;
+    traccia.percorso = traccia.percorso.replace(/[^/]*$/, nuovo);
+    traccia.maniglia = nuovaManiglia;
+    traccia.accesso = { cartella, maniglia: nuovaManiglia };
+    traccia.file = file;
+    return traccia;
+  }
+
+  // ------------------------------------------------------------------
   // Senza File System Access API: una copia modificata da scaricare
   // ------------------------------------------------------------------
   async function copiaDaScaricare(traccia, modifiche, opzioni = {}) {
@@ -296,5 +387,5 @@
     return { blob, lettura: riletto };
   }
 
-  radice.Salvataggio = { salva, accesso, copieDi, ripristina, eliminaCopie, mostraCopie, copiaDaScaricare, ErroreChiaro, COPIE, nomiCopie };
+  radice.Salvataggio = { salva, accesso, copieDi, ripristina, eliminaCopie, mostraCopie, copiaDaScaricare, rinomina, nomiInCartella, ErroreChiaro, COPIE, nomiCopie };
 })(typeof globalThis !== "undefined" ? globalThis : this);

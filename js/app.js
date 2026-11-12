@@ -1164,6 +1164,7 @@
   }
 
   let pianoGruppo = null; // ciò che l'anteprima ha mostrato: si scrive esattamente quello
+  let opzioniPiano = {};
 
   function apriAnteprimaGruppo() {
     if (!Gruppo.quanteModifiche(gruppo.modifiche) || salvataggioInCorso) return;
@@ -1195,7 +1196,16 @@
       piano.push({ t, m });
     }
     if (!piano.length) { avvisa("Tutte le tracce scelte hanno già questi valori: non c'è niente da scrivere."); return; }
+    mostraPianoCampi(piano, giaAPosto, { dopo: () => { gruppo.modifiche = {}; } });
+  }
+
+  /**
+   * Mostra l'anteprima di un piano di salvataggio: [{ t, m }] = per ogni traccia le sue modifiche.
+   * Serve alla modifica a gruppi e agli strumenti. "opzioni.dopo" si esegue quando tutto è salvato.
+   */
+  function mostraPianoCampi(piano, giaAPosto = [], opzioni = {}) {
     pianoGruppo = piano;
+    opzioniPiano = opzioni;
 
     const corpo = $("#anteprima-corpo");
     corpo.replaceChildren();
@@ -1216,7 +1226,7 @@
           el("td", { classe: dopo ? "dopo" : "dopo vuoto-cella", testo: dopo || "(tolto)" }));
       })));
     corpo.append(
-      el("p", { testo: `Cambieranno ${piano.length} file${giaAPosto.length ? `; ${giaAPosto.length} ${giaAPosto.length === 1 ? "ha" : "hanno"} già questi valori e non ${giaAPosto.length === 1 ? "verrà toccato" : "verranno toccati"}` : ""}.` }),
+      el("p", { testo: `${piano.length === 1 ? "Cambierà 1 file" : `Cambieranno ${piano.length} file`}${giaAPosto.length ? `; ${giaAPosto.length} non ${giaAPosto.length === 1 ? "ha" : "hanno"} niente da cambiare e non ${giaAPosto.length === 1 ? "verrà toccato" : "verranno toccati"}` : ""}.` }),
       el("div", { classe: "elenco-file" }, piano.map((p, i) => el("details", { classe: "file-anteprima", open: piano.length <= 3 || i === 0 },
         el("summary", {}, el("b", { testo: (p.t.lettura.campi.titolo || p.t.nome) }), ` · ${p.t.formato} · ${Object.keys(p.m).length} ${Object.keys(p.m).length === 1 ? "campo" : "campi"}`),
         el("p", { classe: "nome-file", testo: p.t.percorso }),
@@ -1262,12 +1272,12 @@
         stato.textContent = "· salvato" + (esito.sulPosto ? " (audio fermo)" : "");
         salvati++;
       }
-      gruppo.modifiche = {};
+      if (opzioniPiano.dopo) opzioniPiano.dopo();
       pianoGruppo = null;
       finestraAnteprima.close();
       ordina(); disegnaPila(); disegnaScheda();
       imprimiTimbro();
-      avvisa(`Fatto: ${salvati} file salvati, ognuno con la sua copia di sicurezza.`, 7000);
+      avvisa(salvati === 1 ? "Fatto: file salvato, con la sua copia di sicurezza." : `Fatto: ${salvati} file salvati, ognuno con la sua copia di sicurezza.`, 7000);
     } catch (e) {
       console.error(e);
       const ultima = passi.lastElementChild;
@@ -1469,6 +1479,224 @@
     for (const [id, x] of Object.entries(gruppo.modifiche)) if (id !== "copertina" && id !== "traccia") v[id] = x;
     return v;
   };
+
+  // ==========================================================================
+  // STRUMENTI: spazi, maiuscole, cerca e sostituisci, rinomina dei file
+  // Lavorano sulla traccia aperta oppure sulle tracce scelte.
+  // ==========================================================================
+  const finestraStrumenti = $("#strumenti");
+  let ultimaRinomina = null; // [{ t, vecchio, nuovo }] per poter tornare indietro
+
+  /** Le tracce su cui lavorano gli strumenti dei campi. */
+  function bersagliCampi() {
+    if (inGruppo()) return tracceScelte().filter((t) => !escluso(t) && t.maniglia);
+    const t = tracce[corrente];
+    return t && t.stato === "letto" && Formati.per(t.formato).controlla(t.lettura).ok ? [t] : [];
+  }
+  /** Le tracce da rinominare: serve solo che si leggano e si possano scrivere. */
+  function bersagliRinomina() {
+    const elenco = inGruppo() ? tracceScelte() : tracce[corrente] ? [tracce[corrente]] : [];
+    return elenco.filter((t) => t.stato === "letto" && t.maniglia);
+  }
+  const descriviBersagli = (lista) => (!lista.length ? "nessuna traccia (apri una traccia o scegline più di una nella pila)"
+    : lista.length === 1 ? `la traccia «${lista[0].lettura.campi.titolo || lista[0].nome}»` : `le ${lista.length} tracce scelte`);
+
+  function apriStrumenti(scheda) {
+    if (Gruppo.quanteModifiche(gruppo.modifiche)) { avvisa("Prima salva o annulla le modifiche di gruppo in corso."); return; }
+    $("#strumenti-destinazione").textContent = "Si applica a: " + descriviBersagli(bersagliCampi());
+    $("#rinomina-destinazione").textContent = "Si applica a: " + descriviBersagli(bersagliRinomina());
+    mostraLinguetta(scheda || linguettaAttiva);
+    aggiornaEsempi();
+    $("#rinomina-annulla-ultima").hidden = !ultimaRinomina;
+    finestraStrumenti.showModal();
+  }
+  $("#apri-strumenti").addEventListener("click", () => apriStrumenti());
+
+  // linguette
+  let linguettaAttiva = "spazi";
+  function mostraLinguetta(id) {
+    linguettaAttiva = id;
+    document.querySelectorAll("#strumenti [role=tab]").forEach((b) => {
+      const sua = b.dataset.scheda === id;
+      b.setAttribute("aria-selected", String(sua));
+      b.tabIndex = sua ? 0 : -1;
+      $("#pannello-" + b.dataset.scheda).hidden = !sua;
+    });
+  }
+  document.querySelectorAll("#strumenti [role=tab]").forEach((b, i, tutte) => {
+    b.addEventListener("click", () => mostraLinguetta(b.dataset.scheda));
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const altra = tutte[(i + (e.key === "ArrowRight" ? 1 : tutte.length - 1)) % tutte.length];
+      mostraLinguetta(altra.dataset.scheda); altra.focus();
+    });
+  });
+
+  // campi tra cui scegliere per sostituire
+  $("#sost-campo").append(...Strumenti.CAMPI_TESTO.map((c) => el("option", { value: c.id, testo: c.etichetta })));
+  // schemi pronti per la rinomina e segnaposto da inserire
+  $("#rinomina-schemi").append(...Strumenti.SCHEMI.map((x) => el("option", { value: x, testo: x })));
+  $("#rinomina-schemi").addEventListener("change", (e) => { if (e.target.value) { $("#rinomina-schema").value = e.target.value; aggiornaEsempi(); } });
+  $("#rinomina-segnaposto").append(...Object.entries(Strumenti.SEGNAPOSTO).map(([k, spiega]) =>
+    el("button", { classe: "bottone leggero mini", type: "button", title: spiega, suclick: () => {
+      const c = $("#rinomina-schema");
+      const [a, b] = [c.selectionStart, c.selectionEnd];
+      c.value = c.value.slice(0, a) + `{${k}}` + c.value.slice(b);
+      c.focus(); aggiornaEsempi();
+    } }, `{${k}}`)));
+  for (const id of ["#rinomina-schema", "#sost-cerca", "#sost-con"]) $(id).addEventListener("input", aggiornaEsempi);
+  document.querySelectorAll('#pannello-maiuscole input').forEach((x) => x.addEventListener("change", aggiornaEsempi));
+
+  /** Gli esempi dal vivo, presi dalla prima traccia. */
+  function aggiornaEsempi() {
+    const t = bersagliCampi()[0] || bersagliRinomina()[0];
+    const campi = t ? Campi.valoriFinali(t.lettura.campi, t.modifiche || {}) : { titolo: "la città di notte", traccia: ["3", "12"], artista: "Le Sfogline" };
+    const modo = document.querySelector('input[name="modo-maiuscole"]:checked').value;
+    const titolo = campi.titolo || "la città di notte";
+    $("#maiuscole-esempio").textContent = `«${titolo}» → «${Strumenti.maiuscole(titolo, modo)}»`;
+    const r = Strumenti.nomeDaSchema($("#rinomina-schema").value, campi, Strumenti.estensioneDi(t ? t.nome : ".mp3"));
+    $("#rinomina-esempio").textContent = r.segnapostoSconosciuti.length ? `Segnaposto sconosciuto: {${r.segnapostoSconosciuti.join("}, {")}}`
+      : r.mancano.length ? `Esempio: a questa traccia manca ${r.mancano.join(", ")}` : `Esempio: «${t ? t.nome : "file.mp3"}» → «${r.nome}»`;
+  }
+
+  // ---------- strumenti dei campi ----------
+  function opzioniStrumento(strumento) {
+    if (strumento === "maiuscole") {
+      return { modo: document.querySelector('input[name="modo-maiuscole"]:checked').value,
+        campi: [...document.querySelectorAll('input[name="campi-maiuscole"]:checked')].map((x) => x.value) };
+    }
+    if (strumento === "sostituisci") {
+      const campo = $("#sost-campo").value;
+      return { cerca: $("#sost-cerca").value, con: $("#sost-con").value, campi: campo ? [campo] : [],
+        maiuscoleDistinte: $("#sost-maiuscole").checked, paroleIntere: $("#sost-parole").checked };
+    }
+    return {};
+  }
+
+  function anteprimaStrumento(strumento) {
+    const opzioni = opzioniStrumento(strumento);
+    if (strumento === "sostituisci" && !opzioni.cerca) { avvisa("Scrivi che cosa cercare."); $("#sost-cerca").focus(); return; }
+    if (strumento === "maiuscole" && !opzioni.campi.length) { avvisa("Scegli almeno un campo."); return; }
+    const bersagli = bersagliCampi();
+    if (!bersagli.length) { avvisa("Apri prima una traccia che si può modificare, oppure scegline più di una nella pila."); return; }
+    const piano = [], giaAPosto = [];
+    for (const t of bersagli) {
+      const base = Campi.valoriFinali(t.lettura.campi, t.modifiche || {});
+      const nuove = Strumenti.modifiche(base, strumento, opzioni);
+      if (!Object.keys(nuove).length) { giaAPosto.push(t); continue; }
+      for (const [k, v] of Object.entries(nuove)) {
+        const esito = Campi.controllaValore(k, v, t.formato);
+        if (esito.errore) { avvisa(`«${t.nome}», ${(Campi.TUTTI.find((c) => c.id === k) || {}).etichetta}: dopo la modifica il valore non va bene. ${esito.errore}`, 10000); return; }
+      }
+      // le modifiche già in corso sulla traccia (scheda singola) restano e si salvano insieme
+      const m = { ...(t.modifiche || {}), ...nuove };
+      try { Formati.per(t.formato).prepara(t.lettura, m); }
+      catch (e) { avvisa(`«${t.nome}»: ${(e && e.message) || e}`, 9000); return; }
+      piano.push({ t, m });
+    }
+    if (!piano.length) { avvisa(bersagli.length === 1 ? "Non c'è niente da cambiare in questa traccia." : "Non c'è niente da cambiare nelle tracce scelte."); return; }
+    finestraStrumenti.close();
+    mostraPianoCampi(piano, giaAPosto, {});
+  }
+  $("#spazi-vai").addEventListener("click", () => anteprimaStrumento("spazi"));
+  $("#maiuscole-vai").addEventListener("click", () => anteprimaStrumento("maiuscole"));
+  $("#sost-vai").addEventListener("click", () => anteprimaStrumento("sostituisci"));
+
+  // ---------- rinomina dei file ----------
+  let pianoRinomina = null;
+
+  async function anteprimaRinomina() {
+    const schema = $("#rinomina-schema").value.trim();
+    const bersagli = bersagliRinomina();
+    if (!bersagli.length) { avvisa("Apri prima una traccia, oppure scegline più di una nella pila."); return; }
+    if (!schema) { avvisa("Scrivi lo schema dei nomi, per esempio {traccia} - {titolo}."); return; }
+    const prova = Strumenti.nomeDaSchema(schema, {}, ".mp3");
+    if (prova.segnapostoSconosciuti.length) { avvisa(`Nello schema c'è un segnaposto che non conosco: {${prova.segnapostoSconosciuti[0]}}.`); return; }
+    if (bersagli.some((t) => quanteModifiche(t))) avvisa("Attenzione: i nomi si costruiscono dai tag già salvati nei file, non dalle modifiche ancora da salvare.", 8000);
+    const cartellaDi = (t) => t.percorso.replace(/[^/]*$/, "");
+    const altri = [];
+    for (const t of bersagli) {
+      const nomi = (await Salvataggio.nomiInCartella(t)) || [];
+      const coinvolti = new Set(bersagli.filter((x) => cartellaDi(x) === cartellaDi(t)).map((x) => x.nome));
+      altri.push(nomi.filter((n) => !coinvolti.has(n)));
+    }
+    const piano = Strumenti.pianoRinomina(bersagli.map((t) => ({ nome: t.nome, cartella: cartellaDi(t), campi: t.lettura.campi })), schema, altri);
+    piano.forEach((p, i) => { p.t = bersagli[i]; });
+    const daFare = piano.filter((p) => p.stato === "cambia");
+    finestraStrumenti.close();
+    mostraRinomina(piano, daFare);
+  }
+  $("#rinomina-vai").addEventListener("click", anteprimaRinomina);
+
+  function mostraRinomina(piano, daFare, titolo = "Prima di rinominare: ecco i nomi nuovi") {
+    pianoRinomina = daFare;
+    $("#titolo-anteprima").textContent = titolo;
+    const corpo = $("#anteprima-corpo");
+    corpo.replaceChildren(
+      el("p", { testo: daFare.length ? `Cambierà il nome di ${daFare.length} file${piano.length > daFare.length ? `; ${piano.length - daFare.length} restano come sono` : ""}.` : "Nessun file cambierà nome." }),
+      el("div", { classe: "elenco-file" }, el("table", { classe: "confronto" },
+        el("thead", {}, el("tr", {}, el("th", { scope: "col", testo: "Nome di adesso" }), el("th", { scope: "col", testo: "Nome nuovo" }))),
+        el("tbody", {}, piano.map((p) => el("tr", { classe: p.stato === "cambia" ? "" : "resta" },
+          el("td", { testo: p.vecchio }),
+          el("td", { classe: p.stato === "cambia" ? "dopo" : "vuoto-cella", testo: p.stato === "cambia" ? p.nuovo : `resta così (${p.nota})` })))))),
+      el("ul", { classe: "note-salvataggio" },
+        el("li", { testo: "Cambia solo il nome dei file: il contenuto (tag e audio) resta identico." }),
+        el("li", { testo: `Le copie di sicurezza nella cartella «${Salvataggio.COPIE}» prendono anche loro il nome nuovo.` }),
+        el("li", { testo: "Se un file dà un problema mi fermo: quelli già rinominati restano così, gli altri come sono." })),
+      el("ol", { classe: "passi", id: "passi", hidden: true }));
+    $("#anteprima-conferma").textContent = daFare.length === 1 ? "Rinomina 1 file" : `Rinomina ${daFare.length} file`;
+    $("#anteprima-conferma").disabled = !daFare.length;
+    $("#anteprima-annulla").disabled = false;
+    $("#anteprima-annulla").textContent = "Annulla";
+    $("#anteprima-conferma").onclick = eseguiRinomina;
+    finestraAnteprima.addEventListener("close", () => { $("#titolo-anteprima").textContent = "Prima di scrivere: ecco cosa cambia"; }, { once: true });
+    finestraAnteprima.showModal();
+  }
+
+  async function eseguiRinomina() {
+    const piano = pianoRinomina;
+    if (!piano || !piano.length) return;
+    salvataggioInCorso = true;
+    $("#anteprima-conferma").disabled = true;
+    $("#anteprima-annulla").disabled = true;
+    const passi = $("#passi");
+    passi.hidden = false;
+    passi.replaceChildren();
+    const fatti = [];
+    try {
+      for (const p of piano) await Salvataggio.accesso(p.t);
+      for (const p of piano) {
+        const riga = el("li", { testo: `«${p.vecchio}» → «${p.nuovo}»` });
+        passi.append(riga);
+        await Salvataggio.rinomina(p.t, p.nuovo);
+        riga.classList.add("fatto");
+        fatti.push({ t: p.t, vecchio: p.vecchio, nuovo: p.nuovo });
+      }
+      finestraAnteprima.close();
+      avvisa(fatti.length === 1 ? "Ho rinominato 1 file." : `Ho rinominato ${fatti.length} file. Se vuoi tornare indietro: Strumenti → Rinomina → «Torna ai nomi di prima».`, 8000);
+    } catch (e) {
+      console.error(e);
+      const ultima = passi.lastElementChild;
+      if (ultima && !ultima.classList.contains("fatto")) ultima.classList.add("fallito");
+      const testo = e instanceof Salvataggio.ErroreChiaro ? e.message : `${(e && e.name) || "errore"}: ${(e && e.message) || e}`;
+      passi.append(el("li", { classe: "errore-passo", testo: `Mi sono fermato. ${fatti.length ? `${fatti.length} file ${fatti.length === 1 ? "è stato rinominato" : "sono stati rinominati"}; ` : ""}gli altri hanno ancora il nome di prima. Motivo: ${testo}` }));
+      $("#anteprima-annulla").disabled = false;
+      $("#anteprima-annulla").textContent = "Chiudi";
+    } finally {
+      if (fatti.length) ultimaRinomina = fatti;
+      salvataggioInCorso = false;
+      ordina(); disegnaPila(); disegnaScheda();
+    }
+  }
+
+  $("#rinomina-annulla-ultima").addEventListener("click", () => {
+    if (!ultimaRinomina) return;
+    const piano = ultimaRinomina.filter((x) => tracce.includes(x.t) && x.t.nome === x.nuovo)
+      .map((x) => ({ t: x.t, vecchio: x.nuovo, nuovo: x.vecchio, stato: "cambia" }));
+    finestraStrumenti.close();
+    ultimaRinomina = null;
+    mostraRinomina(piano, piano, "Tornare ai nomi di prima?");
+  });
 
   async function apri(i) {
     if (i < 0 || i >= tracce.length) return;

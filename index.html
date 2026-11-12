@@ -38,6 +38,7 @@
     <symbol id="i-timbro" viewBox="0 0 24 24"><path d="M9.6 3.6h4.8l-.8 6h4.6a1 1 0 0 1 1 .8l.8 3.8H4l.8-3.8a1 1 0 0 1 1-.8h4.6z"/><path d="M5 17.4h14M7 20.4h10"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.6"/><path d="M12 7.6v.1" stroke-width="2.4"/></symbol>
     <symbol id="i-modello" viewBox="0 0 24 24"><path d="M8.6 3.6h10a1.4 1.4 0 0 1 1.4 1.4v10.4"/><path d="M5.4 7h10.2a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19.2V8.4A1.4 1.4 0 0 1 5.4 7z"/><path d="M7.4 11.4h6.2M7.4 14.6h6.2M7.4 17.8h3.6"/></symbol>
+    <symbol id="i-mattarello" viewBox="0 0 24 24"><path d="M7.2 16.8 16.8 7.2"/><path d="M8.8 18.4l-3.2-3.2 9.6-9.6 3.2 3.2z"/><path d="M5.6 18.4 3.4 20.6M18.4 5.6l2.2-2.2"/></symbol>
     <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3.6 11.2 12 4.4l8.4 6.8"/><path d="M5.8 9.6v9.8h12.4V9.6"/><path d="M10 19.4v-5.2h4v5.2"/></symbol>
     <symbol id="i-occhio-esempio" viewBox="0 0 24 24"><path d="M4.4 4.4h10.2l5 5V19.6H4.4z"/><path d="M8 10h6M8 13.4h8M8 16.8h5"/></symbol>
   </defs>
@@ -78,6 +79,9 @@
       <button type="button" data-tema="chiaro" aria-pressed="false" title="Tema chiaro"><svg class="icona" aria-hidden="true"><use href="#i-sole"/></svg><span class="solo-lettori">Chiaro</span></button>
       <button type="button" data-tema="scuro" aria-pressed="false" title="Tema scuro"><svg class="icona" aria-hidden="true"><use href="#i-luna"/></svg><span class="solo-lettori">Scuro</span></button>
     </div>
+    <button class="bottone leggero" id="apri-strumenti" type="button" title="Strumenti: spazi, maiuscole, cerca e sostituisci, rinomina dei file">
+      <svg class="icona" aria-hidden="true"><use href="#i-mattarello"/></svg><span class="testo-lungo">Strumenti</span>
+    </button>
     <button class="bottone leggero" id="apri-modelli" type="button" title="Modelli di edizione: insiemi di campi da riapplicare">
       <svg class="icona" aria-hidden="true"><use href="#i-modello"/></svg><span class="testo-lungo">Modelli</span>
     </button>
@@ -115,7 +119,7 @@
   <span>© Roberto Lanza · licenza <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.it" rel="license noopener" target="_blank">CC BY-NC-SA 4.0</a></span>
   <span>Tutto avviene sul tuo computer: nessun file viene caricato su internet.</span>
   <span>Funziona al completo in Chrome ed Edge.</span>
-  <span>versione <span id="versione">0.8.0</span></span>
+  <span>versione <span id="versione">0.9.0</span></span>
 </footer>
 
 <!-- Finestrella delle scorciatoie -->
@@ -184,6 +188,68 @@
   </p>
 </dialog>
 
+<!-- Strumenti -->
+<dialog id="strumenti" aria-labelledby="titolo-strumenti" class="largo">
+  <h2 id="titolo-strumenti">Strumenti</h2>
+  <div class="linguette" role="tablist" aria-label="Strumenti">
+    <button type="button" role="tab" data-scheda="spazi" aria-controls="pannello-spazi">Spazi</button>
+    <button type="button" role="tab" data-scheda="maiuscole" aria-controls="pannello-maiuscole">Maiuscole</button>
+    <button type="button" role="tab" data-scheda="sostituisci" aria-controls="pannello-sostituisci">Cerca e sostituisci</button>
+    <button type="button" role="tab" data-scheda="rinomina" aria-controls="pannello-rinomina">Rinomina i file</button>
+  </div>
+
+  <section id="pannello-spazi" role="tabpanel" class="pannello">
+    <p class="nota-piccola" id="strumenti-destinazione"></p>
+    <p>Toglie gli spazi all'inizio e alla fine di ogni campo e riduce a uno quelli ripetuti. Nel testo del brano e nei commenti tiene gli a capo.</p>
+    <p class="bottoni-dialogo"><button class="bottone principale" type="button" id="spazi-vai">Mostra l'anteprima</button></p>
+  </section>
+
+  <section id="pannello-maiuscole" role="tabpanel" class="pannello" hidden>
+    <fieldset>
+      <legend>Come</legend>
+      <label><input type="radio" name="modo-maiuscole" value="iniziali" checked> Iniziali maiuscole <small>(La Città di Notte: articoli e preposizioni restano minuscoli)</small></label><br>
+      <label><input type="radio" name="modo-maiuscole" value="prima"> Solo la prima lettera <small>(La città di notte: il resto non cambia)</small></label>
+    </fieldset>
+    <fieldset>
+      <legend>In quali campi</legend>
+      <label><input type="checkbox" name="campi-maiuscole" value="titolo" checked> Titolo</label>
+      <label><input type="checkbox" name="campi-maiuscole" value="album"> Album</label>
+      <label><input type="checkbox" name="campi-maiuscole" value="sottotitolo"> Sottotitolo</label>
+      <label><input type="checkbox" name="campi-maiuscole" value="raggruppamento"> Raggruppamento</label>
+      <label><input type="checkbox" name="campi-maiuscole" value="artista"> Artista</label>
+      <label><input type="checkbox" name="campi-maiuscole" value="artistaAlbum"> Artista dell'album</label>
+    </fieldset>
+    <p class="nota-piccola" id="maiuscole-esempio"></p>
+    <p class="nota-piccola">Le sigle (DJ, RAI), i nomi come iPhone e i numeri romani restano come sono.</p>
+    <p class="bottoni-dialogo"><button class="bottone principale" type="button" id="maiuscole-vai">Mostra l'anteprima</button></p>
+  </section>
+
+  <section id="pannello-sostituisci" role="tabpanel" class="pannello" hidden>
+    <p class="campo"><label for="sost-cerca">Cerca</label><input id="sost-cerca" autocomplete="off"></p>
+    <p class="campo"><label for="sost-con">Sostituisci con</label><input id="sost-con" autocomplete="off" placeholder="(lascia vuoto per cancellare il testo trovato)"></p>
+    <p class="campo"><label for="sost-campo">In quale campo</label><select id="sost-campo"><option value="">tutti i campi di testo</option></select></p>
+    <p>
+      <label><input type="checkbox" id="sost-maiuscole"> Distingui maiuscole e minuscole</label><br>
+      <label><input type="checkbox" id="sost-parole"> Solo parole intere</label>
+    </p>
+    <p class="bottoni-dialogo"><button class="bottone principale" type="button" id="sost-vai">Mostra l'anteprima</button></p>
+  </section>
+
+  <section id="pannello-rinomina" role="tabpanel" class="pannello" hidden>
+    <p class="nota-piccola" id="rinomina-destinazione"></p>
+    <p class="campo"><label for="rinomina-schemi">Schemi pronti</label><select id="rinomina-schemi"><option value="">scegli…</option></select></p>
+    <p class="campo"><label for="rinomina-schema">Schema dei nomi</label><input id="rinomina-schema" value="{traccia} - {titolo}" autocomplete="off" spellcheck="false"></p>
+    <p class="segnaposto" id="rinomina-segnaposto"><span class="nota-piccola">Inserisci:</span> </p>
+    <p class="nota-piccola" id="rinomina-esempio"></p>
+    <p class="nota-piccola">L'estensione (.mp3, .flac) resta quella del file. I caratteri che i computer non accettano nei nomi (come / : ? *) diventano un trattino.</p>
+    <p class="bottoni-dialogo">
+      <button class="bottone leggero" type="button" id="rinomina-annulla-ultima" hidden>Torna ai nomi di prima…</button>
+      <button class="bottone principale" type="button" id="rinomina-vai">Mostra l'anteprima della rinomina</button>
+    </p>
+  </section>
+  <p class="bottoni-dialogo"><button class="bottone" type="button" onclick="this.closest('dialog').close()">Chiudi</button></p>
+</dialog>
+
 <!-- Modelli di edizione -->
 <dialog id="modelli" aria-labelledby="titolo-modelli" class="largo">
   <h2 id="titolo-modelli">Modelli di edizione</h2>
@@ -240,6 +306,7 @@
 <script src="js/formati.js"></script>
 <script src="js/gruppo.js"></script>
 <script src="js/modelli.js"></script>
+<script src="js/strumenti.js"></script>
 <script src="js/supporto.js"></script>
 <script src="js/apertura.js"></script>
 <script src="js/salvataggio.js"></script>
