@@ -8,6 +8,24 @@ Funziona nel browser, sul tuo computer, senza installare niente.
 
 ---
 
+## Anteprima
+
+Ogni brano è una scheda di collezione. A sinistra la pila delle tracce, al centro la scheda da compilare, con la copertina incollata in un angolo.
+
+<p align="center"><img src="docs/anteprima-scheda.jpg" alt="Tag-liatelle: l'elenco delle tracce e la scheda di un brano con la copertina" width="800"></p>
+
+Quando cambi qualcosa, la scheda lo segna e in basso compare il conteggio delle modifiche non ancora salvate. Non si scrive niente finché non lo confermi.
+
+<p align="center"><img src="docs/anteprima-modifica.jpg" alt="Tag-liatelle: un campo modificato e la barra con 1 modifica non ancora salvata" width="800"></p>
+
+C'è anche il tema scuro.
+
+<p align="center"><img src="docs/anteprima-tema-scuro.jpg" alt="Tag-liatelle nel tema scuro" width="800"></p>
+
+*Le schermate usano i file di prova della cartella `esempi/`.*
+
+---
+
 ## Indice
 
 1. [Tutto avviene sul tuo computer](#tutto-avviene-sul-tuo-computer)
